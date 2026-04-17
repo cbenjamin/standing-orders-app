@@ -2,7 +2,7 @@
 
 client_id = "8bd82490f600f9e239f82229fe516acf"
 name = "standing-orders-app"
-application_url = "https://example.com"
+application_url = "https://standing-orders.chrisbenjamin.co"
 embedded = true
 
 [build]
@@ -25,7 +25,7 @@ api_version = "2026-07"
 scopes = "read_customers,write_draft_orders,read_products,read_orders"
 
 [auth]
-redirect_urls = [ "https://example.com/api/auth" ]
+redirect_urls = [ "https://standing-orders.chrisbenjamin.co/auth/callback" ]
 
 [product.metafields.app.demo_info]
 type = "single_line_text_field"
