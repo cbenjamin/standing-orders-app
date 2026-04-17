@@ -3,7 +3,7 @@ import { useLoaderData, useActionData, useFetcher, Form, redirect } from "react-
 import portalCss from "../styles/portal.css?url";
 import { requirePortalCustomer, getSession, destroySession } from "../portal-session.server";
 import { unauthenticated } from "../shopify.server";
-import { getDraftOrderDetails, updateDraftOrder } from "../services/shopify-graphql.server";
+import { getDraftOrderDetails } from "../services/shopify-graphql.server";
 import { applyCustomerDraftOrderUpdate } from "../services/draft-orders.server";
 import { searchStorefrontProducts } from "../services/shopify-storefront.server";
 import prisma from "../db.server";
