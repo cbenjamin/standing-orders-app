@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { useLoaderData, useActionData, useNavigation, useFetcher, Form, redirect } from "react-router";
+import { useLoaderData, useActionData, useNavigation, useFetcher, Form, Link, redirect } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
@@ -159,9 +159,9 @@ export default function EditStandingOrder() {
   return (
     <s-page heading={`Edit: ${order.name}`}>
       <s-button slot="primary-action" variant="tertiary">
-        <a href={`/app/standing-orders/${order.id}`} style={{ color: "inherit", textDecoration: "none" }}>
+        <Link to={`/app/standing-orders/${order.id}`} style={{ color: "inherit", textDecoration: "none" }}>
           Cancel
-        </a>
+        </Link>
       </s-button>
 
       <Form method="POST">
@@ -292,7 +292,7 @@ export default function EditStandingOrder() {
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "1.5rem" }}>
           <s-button variant="tertiary">
-            <a href={`/app/standing-orders/${order.id}`} style={{ color: "inherit", textDecoration: "none" }}>Cancel</a>
+            <Link to={`/app/standing-orders/${order.id}`} style={{ color: "inherit", textDecoration: "none" }}>Cancel</Link>
           </s-button>
           <s-button variant="primary" type="submit" disabled={isSubmitting || undefined}>
             {isSubmitting ? "Saving…" : "Save changes"}
