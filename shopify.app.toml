@@ -1,7 +1,7 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
-client_id = "5d50cdfa690f1ba6f6ce248bb6c50867"
-name = "standing-orders-app"
+client_id = "4740feca0d072b9e8b451b44eb1ce595"
+name = "standing-orders-custom"
 application_url = "https://standing-orders.chrisbenjamin.co"
 embedded = true
 
