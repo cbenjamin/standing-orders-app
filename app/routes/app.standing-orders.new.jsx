@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { useActionData, useNavigation, useFetcher, Form, redirect } from "react-router";
+import { useActionData, useNavigation, useFetcher, Form, Link, redirect } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
@@ -162,9 +162,9 @@ export default function NewStandingOrder() {
   return (
     <s-page heading="Create Standing Order">
       <s-button slot="primary-action" variant="tertiary">
-        <a href="/app/standing-orders" style={{ color: "inherit", textDecoration: "none" }}>
+        <Link to="/app/standing-orders" style={{ color: "inherit", textDecoration: "none" }}>
           Cancel
-        </a>
+        </Link>
       </s-button>
 
       <Form method="POST">
@@ -341,7 +341,7 @@ export default function NewStandingOrder() {
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "1.5rem" }}>
           <s-button variant="tertiary">
-            <a href="/app/standing-orders" style={{ color: "inherit", textDecoration: "none" }}>Cancel</a>
+            <Link to="/app/standing-orders" style={{ color: "inherit", textDecoration: "none" }}>Cancel</Link>
           </s-button>
           <s-button variant="primary" type="submit" disabled={isSubmitting || undefined}>
             {isSubmitting ? "Creating…" : "Create standing order"}

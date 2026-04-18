@@ -1,5 +1,4 @@
-import { useLoaderData, Form, useNavigation } from "react-router";
-import { redirect } from "react-router";
+import { useLoaderData, Form, useNavigation, Link, redirect } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
@@ -59,14 +58,14 @@ export default function StandingOrderDetail() {
   return (
     <s-page heading={order.name}>
       <s-button slot="primary-action" variant="primary">
-        <a href={`/app/standing-orders/${order.id}/edit`} style={{ color: "inherit", textDecoration: "none" }}>
+        <Link to={`/app/standing-orders/${order.id}/edit`} style={{ color: "inherit", textDecoration: "none" }}>
           Edit
-        </a>
+        </Link>
       </s-button>
       <s-button slot="primary-action" variant="tertiary">
-        <a href="/app/standing-orders" style={{ color: "inherit", textDecoration: "none" }}>
+        <Link to="/app/standing-orders" style={{ color: "inherit", textDecoration: "none" }}>
           ← Back
-        </a>
+        </Link>
       </s-button>
 
       {/* Summary */}

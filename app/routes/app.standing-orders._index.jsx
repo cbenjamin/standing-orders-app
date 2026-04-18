@@ -20,9 +20,9 @@ export default function StandingOrderList() {
   return (
     <s-page heading="Standing Orders">
       <s-button slot="primary-action" variant="primary">
-        <a href="/app/standing-orders/new" style={{ color: "inherit", textDecoration: "none" }}>
+        <Link to="/app/standing-orders/new" style={{ color: "inherit", textDecoration: "none" }}>
           Create standing order
-        </a>
+        </Link>
       </s-button>
 
       {orders.length === 0 ? (
@@ -31,9 +31,9 @@ export default function StandingOrderList() {
             Create your first standing order to start automating weekly deliveries for your chefs.
           </s-paragraph>
           <s-button>
-            <a href="/app/standing-orders/new" style={{ color: "inherit", textDecoration: "none" }}>
+            <Link to="/app/standing-orders/new" style={{ color: "inherit", textDecoration: "none" }}>
               Create standing order
-            </a>
+            </Link>
           </s-button>
         </s-section>
       ) : (
@@ -55,12 +55,12 @@ export default function StandingOrderList() {
                   style={{ borderBottom: "1px solid #f1f1f1", cursor: "pointer" }}
                 >
                   <td style={{ padding: "0.75rem" }}>
-                    <a
-                      href={`/app/standing-orders/${order.id}`}
+                    <Link
+                      to={`/app/standing-orders/${order.id}`}
                       style={{ color: "#008060", fontWeight: 500, textDecoration: "none" }}
                     >
                       {order.name}
-                    </a>
+                    </Link>
                   </td>
                   <td style={{ padding: "0.75rem" }}>
                     <div style={{ fontWeight: 500 }}>{order.customerName}</div>
