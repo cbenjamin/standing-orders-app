@@ -1,6 +1,6 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
-client_id = "8bd82490f600f9e239f82229fe516acf"
+client_id = "5d50cdfa690f1ba6f6ce248bb6c50867"
 name = "standing-orders-app"
 application_url = "https://standing-orders.chrisbenjamin.co"
 embedded = true
@@ -22,7 +22,7 @@ api_version = "2026-07"
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "read_customers,write_draft_orders,read_products,read_orders"
+scopes = "read_customers,write_draft_orders,read_products,read_orders,write_products"
 
 [auth]
 redirect_urls = [ "https://standing-orders.chrisbenjamin.co/auth/callback" ]
