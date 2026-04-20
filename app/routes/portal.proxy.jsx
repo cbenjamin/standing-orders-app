@@ -7,10 +7,10 @@ import { applyCustomerDraftOrderUpdate } from "../services/draft-orders.server";
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 function verifySignature(request) {
-  const secret = process.env.SHOPIFY_API_SECRET;
+  const secret = (process.env.SHOPIFY_API_SECRET || "").trim();
   const rawQuery = new URL(request.url).search.slice(1);
   console.log("[proxy] rawQuery:", rawQuery);
-  console.log("[proxy] secret set:", !!secret, "secret[:4]:", secret?.slice(0, 4));
+  console.log("[proxy] secret len:", secret.length, "secret[:4]:", secret.slice(0, 4));
   if (!secret) return false;
   let signature = "";
   const parts = rawQuery.split("&").filter((p) => {
