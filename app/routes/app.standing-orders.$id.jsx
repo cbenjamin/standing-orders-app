@@ -1,4 +1,4 @@
-import { useLoaderData, Form, useNavigation, Link, redirect } from "react-router";
+import { useLoaderData, Form, useNavigation, useNavigate, redirect } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
@@ -47,6 +47,7 @@ export const action = async ({ request, params }) => {
 export default function StandingOrderDetail() {
   const { order } = useLoaderData();
   const navigation = useNavigation();
+  const navigate = useNavigate();
   const isSubmitting = navigation.state === "submitting";
 
   const draftStatusColor = {
@@ -57,15 +58,11 @@ export default function StandingOrderDetail() {
 
   return (
     <s-page heading={order.name}>
-      <s-button slot="primary-action" variant="primary">
-        <Link to={`/app/standing-orders/${order.id}/edit`} style={{ color: "inherit", textDecoration: "none" }}>
-          Edit
-        </Link>
+      <s-button slot="primary-action" variant="primary" onClick={() => navigate(`/app/standing-orders/${order.id}/edit`)}>
+        Edit
       </s-button>
-      <s-button slot="primary-action" variant="tertiary">
-        <Link to="/app/standing-orders" style={{ color: "inherit", textDecoration: "none" }}>
-          ← Back
-        </Link>
+      <s-button slot="primary-action" variant="tertiary" onClick={() => navigate("/app/standing-orders")}>
+        ← Back
       </s-button>
 
       {/* Summary */}
@@ -86,13 +83,24 @@ export default function StandingOrderDetail() {
         <div style={{ marginTop: "1rem", display: "flex", gap: "0.75rem" }}>
           <Form method="POST">
             <input type="hidden" name="intent" value="toggle-status" />
-            <s-button type="submit" disabled={isSubmitting || undefined}>
+            <s-button
+              disabled={isSubmitting || undefined}
+              onClick={(e) => e.currentTarget.closest("form")?.requestSubmit()}
+            >
               {order.status === "active" ? "Pause" : "Resume"}
             </s-button>
           </Form>
-          <Form method="POST" onSubmit={(e) => { if (!confirm("Mark this standing order as expired? No new draft orders will be created.")) e.preventDefault(); }}>
+          <Form method="POST">
             <input type="hidden" name="intent" value="delete" />
-            <s-button tone="critical" type="submit" disabled={isSubmitting || undefined}>
+            <s-button
+              tone="critical"
+              disabled={isSubmitting || undefined}
+              onClick={(e) => {
+                if (confirm("Mark this standing order as expired? No new draft orders will be created.")) {
+                  e.currentTarget.closest("form")?.requestSubmit();
+                }
+              }}
+            >
               Delete
             </s-button>
           </Form>

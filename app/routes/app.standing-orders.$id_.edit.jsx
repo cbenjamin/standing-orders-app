@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { useLoaderData, useActionData, useNavigation, useFetcher, Form, Link, redirect } from "react-router";
+import { useLoaderData, useActionData, useNavigation, useNavigate, useFetcher, Form, redirect } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
@@ -87,6 +87,7 @@ export default function EditStandingOrder() {
   const { order } = useLoaderData();
   const actionData = useActionData();
   const navigation = useNavigation();
+  const navigate = useNavigate();
   const isSubmitting = navigation.state === "submitting";
 
   const customerFetcher = useFetcher();
@@ -158,10 +159,8 @@ export default function EditStandingOrder() {
 
   return (
     <s-page heading={`Edit: ${order.name}`}>
-      <s-button slot="primary-action" variant="tertiary">
-        <Link to={`/app/standing-orders/${order.id}`} style={{ color: "inherit", textDecoration: "none" }}>
-          Cancel
-        </Link>
+      <s-button slot="primary-action" variant="tertiary" onClick={() => navigate(`/app/standing-orders/${order.id}`)}>
+        Cancel
       </s-button>
 
       <Form method="POST">
@@ -291,10 +290,14 @@ export default function EditStandingOrder() {
         </s-section>
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "1.5rem" }}>
-          <s-button variant="tertiary">
-            <Link to={`/app/standing-orders/${order.id}`} style={{ color: "inherit", textDecoration: "none" }}>Cancel</Link>
+          <s-button variant="tertiary" onClick={() => navigate(`/app/standing-orders/${order.id}`)}>
+            Cancel
           </s-button>
-          <s-button variant="primary" type="submit" disabled={isSubmitting || undefined}>
+          <s-button
+            variant="primary"
+            disabled={isSubmitting || undefined}
+            onClick={(e) => e.currentTarget.closest("form")?.requestSubmit()}
+          >
             {isSubmitting ? "Saving…" : "Save changes"}
           </s-button>
         </div>

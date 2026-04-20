@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { useActionData, useNavigation, useFetcher, Form, Link, redirect } from "react-router";
+import { useActionData, useNavigation, useNavigate, useFetcher, Form, redirect } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
@@ -94,6 +94,7 @@ export const action = async ({ request }) => {
 export default function NewStandingOrder() {
   const actionData = useActionData();
   const navigation = useNavigation();
+  const navigate = useNavigate();
   const isSubmitting = navigation.state === "submitting";
 
   const customerFetcher = useFetcher();
@@ -161,10 +162,8 @@ export default function NewStandingOrder() {
 
   return (
     <s-page heading="Create Standing Order">
-      <s-button slot="primary-action" variant="tertiary">
-        <Link to="/app/standing-orders" style={{ color: "inherit", textDecoration: "none" }}>
-          Cancel
-        </Link>
+      <s-button slot="primary-action" variant="tertiary" onClick={() => navigate("/app/standing-orders")}>
+        Cancel
       </s-button>
 
       <Form method="POST">
@@ -340,10 +339,14 @@ export default function NewStandingOrder() {
         </s-section>
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "1.5rem" }}>
-          <s-button variant="tertiary">
-            <Link to="/app/standing-orders" style={{ color: "inherit", textDecoration: "none" }}>Cancel</Link>
+          <s-button variant="tertiary" onClick={() => navigate("/app/standing-orders")}>
+            Cancel
           </s-button>
-          <s-button variant="primary" type="submit" disabled={isSubmitting || undefined}>
+          <s-button
+            variant="primary"
+            disabled={isSubmitting || undefined}
+            onClick={(e) => e.currentTarget.closest("form")?.requestSubmit()}
+          >
             {isSubmitting ? "Creating…" : "Create standing order"}
           </s-button>
         </div>

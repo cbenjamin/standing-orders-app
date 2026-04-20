@@ -1,4 +1,4 @@
-import { useLoaderData, Link } from "react-router";
+import { useLoaderData, useNavigate } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
@@ -16,13 +16,12 @@ export const loader = async ({ request }) => {
 
 export default function StandingOrderList() {
   const { orders } = useLoaderData();
+  const navigate = useNavigate();
 
   return (
     <s-page heading="Standing Orders">
-      <s-button slot="primary-action" variant="primary">
-        <Link to="/app/standing-orders/new" style={{ color: "inherit", textDecoration: "none" }}>
-          Create standing order
-        </Link>
+      <s-button slot="primary-action" variant="primary" onClick={() => navigate("/app/standing-orders/new")}>
+        Create standing order
       </s-button>
 
       {orders.length === 0 ? (
@@ -30,10 +29,8 @@ export default function StandingOrderList() {
           <s-paragraph>
             Create your first standing order to start automating weekly deliveries for your chefs.
           </s-paragraph>
-          <s-button>
-            <Link to="/app/standing-orders/new" style={{ color: "inherit", textDecoration: "none" }}>
-              Create standing order
-            </Link>
+          <s-button onClick={() => navigate("/app/standing-orders/new")}>
+            Create standing order
           </s-button>
         </s-section>
       ) : (
