@@ -10,7 +10,9 @@ function verifySignature(request) {
   const secret = (process.env.SHOPIFY_API_SECRET || "").trim();
   const rawQuery = new URL(request.url).search.slice(1);
   console.log("[proxy] rawQuery:", rawQuery);
+  const apiKey = process.env.SHOPIFY_API_KEY || "";
   console.log("[proxy] secret len:", secret.length, "secret[:4]:", secret.slice(0, 4));
+  console.log("[proxy] api_key[:8]:", apiKey.slice(0, 8));
   if (!secret) return false;
   let signature = "";
   const parts = rawQuery.split("&").filter((p) => {
