@@ -63,6 +63,7 @@ export async function createDraftOrder(admin, { customerId, lineItems, note, tag
           })),
           note,
           tags,
+          shippingLine: { title: "Delivery", price: "5.00" },
         },
       },
     },

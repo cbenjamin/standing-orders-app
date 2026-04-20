@@ -43,11 +43,27 @@ export async function runDraftOrderCreator() {
   }
 }
 
+export async function runDraftOrderLocker() {
+  const today = new Date().getDay();
+  const records = await prisma.draftOrderRecord.findMany({
+    where: { status: "open", standingOrder: { closeDay: today } },
+  });
+
+  console.log(`[cron] Locking ${records.length} draft orders for cutoff`);
+  for (const record of records) {
+    await prisma.draftOrderRecord.update({
+      where: { id: record.id },
+      data: { status: "locked" },
+    });
+    console.log(`[cron] Locked draft order record ${record.id}`);
+  }
+}
+
 export async function runDraftOrderCompleter() {
   const today = new Date().getDay();
   const dueRecords = await prisma.draftOrderRecord.findMany({
     where: {
-      status: "open",
+      status: { in: ["open", "locked"] },
       standingOrder: { closeDay: today },
     },
     include: { standingOrder: true },
@@ -71,12 +87,20 @@ export function initCron() {
   started = true;
 
   const createSchedule = process.env.CRON_DRAFT_CREATE || "0 6 * * *";
+  const lockSchedule = process.env.CRON_DRAFT_LOCK || "0 12 * * *";
   const completeSchedule = process.env.CRON_DRAFT_COMPLETE || "0 21 * * *";
 
   cron.schedule(createSchedule, () => {
     console.log("[cron] Running draft order creation job");
     runDraftOrderCreator().catch((err) =>
       console.error("[cron] Creator job failed:", err.message),
+    );
+  });
+
+  cron.schedule(lockSchedule, () => {
+    console.log("[cron] Running draft order locker job");
+    runDraftOrderLocker().catch((err) =>
+      console.error("[cron] Locker job failed:", err.message),
     );
   });
 
@@ -87,5 +111,5 @@ export function initCron() {
     );
   });
 
-  console.log(`[cron] Scheduler started — create: ${createSchedule} | complete: ${completeSchedule}`);
+  console.log(`[cron] Scheduler started — create: ${createSchedule} | lock: ${lockSchedule} | complete: ${completeSchedule}`);
 }

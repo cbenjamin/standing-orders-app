@@ -30,7 +30,7 @@ export const loader = async ({ request }) => {
 
   const shopifyCustomerId = toGid(customerId);
   const records = await prisma.draftOrderRecord.findMany({
-    where: { status: "open", standingOrder: { shopifyCustomerId } },
+    where: { status: { in: ["open", "locked"] }, standingOrder: { shopifyCustomerId } },
     include: { standingOrder: true, items: true },
     orderBy: { deliveryDate: "asc" },
   });
@@ -58,19 +58,21 @@ export const loader = async ({ request }) => {
         name: record.shopifyDraftOrderName || `#${record.id}`,
         deliveryDate: record.deliveryDate,
         closeDay: record.standingOrder.closeDay,
+        locked: record.status === "locked",
         lineItems,
       };
     })
   );
 
   const successId = url.searchParams.get("updated");
+  const lockedId = url.searchParams.get("locked");
 
   const cardsHtml = orders.length === 0
     ? `<div class="card" style="text-align:center;padding:3rem;color:#6d7175">
         <p>No upcoming orders right now.</p>
         <p style="margin-top:.5rem;font-size:.875rem">Your standing order will appear here each week before your delivery date.</p>
        </div>`
-    : orders.map((order) => orderCard(order, successId)).join("");
+    : orders.map((order) => orderCard(order, successId, lockedId)).join("");
 
   return htmlResponse(page("Your upcoming orders", cardsHtml));
 };
@@ -103,6 +105,12 @@ export const action = async ({ request }) => {
   }
 
   const recordId = formData.get("recordId");
+
+  const record = await prisma.draftOrderRecord.findUnique({ where: { id: Number(recordId) } });
+  if (record?.status === "locked") {
+    return new Response(null, { status: 302, headers: { Location: `/apps/standing-orders?locked=${recordId}` } });
+  }
+
   const lineItemsJson = formData.get("lineItems");
   let lineItems;
   try { lineItems = JSON.parse(lineItemsJson); } catch {
@@ -124,20 +132,42 @@ export const action = async ({ request }) => {
 
 // ── HTML helpers ─────────────────────────────────────────────────────────────
 
-function orderCard(order, successId) {
+function orderCard(order, successId, lockedId) {
   const itemsJs = JSON.stringify(order.lineItems).replace(/<\/script>/gi, "<\\/script>");
   const successBanner = String(successId) === String(order.id)
     ? `<div class="alert alert-success">Order updated successfully.</div>` : "";
+  const lockedBanner = (order.locked || String(lockedId) === String(order.id))
+    ? `<div class="alert alert-warning">This order has passed the cutoff and can no longer be edited.</div>` : "";
 
-  return `
-    <div class="card" id="card-${order.id}">
-      <div class="order-meta">
-        <span>${escHtml(order.name)}</span>
-        <span>Delivery: <strong>${order.deliveryDate}</strong></span>
-        <span>Deadline: <strong>${DAY_NAMES[order.closeDay]}</strong></span>
-      </div>
-      ${successBanner}
-      <form method="POST" onsubmit="return submitOrder(event, ${order.id})">
+  const lockedBadge = order.locked
+    ? `<span style="background:#fff3cd;color:#7c5501;padding:2px 8px;border-radius:10px;font-size:.75rem;font-weight:600">Locked</span>`
+    : "";
+
+  const formOrReadonly = order.locked
+    ? `<table>
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th style="width:110px">Qty</th>
+            <th style="text-align:right;width:110px">Line total</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${order.lineItems.map((li) => `
+            <tr>
+              <td>${escHtml(li.title)}${li.variantTitle ? ` <span style="color:#6d7175;font-size:.8125rem">— ${escHtml(li.variantTitle)}</span>` : ""}</td>
+              <td>${li.quantity}</td>
+              <td style="text-align:right">$${(li.price * li.quantity).toFixed(2)}</td>
+            </tr>`).join("")}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="2" style="text-align:right">Subtotal</td>
+            <td style="text-align:right;font-weight:600">$${order.lineItems.reduce((s, li) => s + li.price * li.quantity, 0).toFixed(2)}</td>
+          </tr>
+        </tfoot>
+      </table>`
+    : `<form method="POST" onsubmit="return submitOrder(event, ${order.id})">
         <input type="hidden" name="intent" value="update-order" />
         <input type="hidden" name="recordId" value="${order.id}" />
         <input type="hidden" name="lineItems" id="li-${order.id}" value="[]" />
@@ -174,9 +204,19 @@ function orderCard(order, successId) {
         <div class="actions-row">
           <button type="submit" class="btn btn-primary">Save changes</button>
         </div>
-      </form>
+      </form>`;
+
+  return `
+    <div class="card" id="card-${order.id}">
+      <div class="order-meta">
+        <span>${escHtml(order.name)} ${lockedBadge}</span>
+        <span>Delivery: <strong>${order.deliveryDate}</strong></span>
+        <span>Deadline: <strong>${DAY_NAMES[order.closeDay]}</strong></span>
+      </div>
+      ${lockedBanner}${successBanner}
+      ${formOrReadonly}
     </div>
-    <script>initCard(${order.id}, ${itemsJs});</script>`;
+    ${order.locked ? "" : `<script>initCard(${order.id}, ${itemsJs});</script>`}`;
 }
 
 function page(title, content) {
@@ -350,6 +390,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .alert{padding:.75rem 1rem;border-radius:4px;margin-bottom:1rem;font-size:.875rem}
 .alert-error{background:#fff4f4;border:1px solid #ffd2cc;color:#d72c0d}
 .alert-success{background:#f1f8f5;border:1px solid #95c9b4;color:#0d3b2e}
+.alert-warning{background:#fff9e6;border:1px solid #ffd369;color:#7c5501}
 table{width:100%;border-collapse:collapse;font-size:.875rem}
 thead th{text-align:left;padding:.5rem .75rem;background:#f6f6f7;border-bottom:1px solid #e1e3e5;font-weight:500;color:#6d7175;font-size:.8125rem}
 tbody td{padding:.75rem;border-bottom:1px solid #e1e3e5;vertical-align:middle}
