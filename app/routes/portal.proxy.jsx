@@ -2,6 +2,7 @@ import prisma from "../db.server";
 import { authenticate, unauthenticated } from "../shopify.server";
 import { getDraftOrderDetails } from "../services/shopify-graphql.server";
 import { applyCustomerDraftOrderUpdate } from "../services/draft-orders.server";
+import { searchStorefrontProducts } from "../services/shopify-storefront.server";
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -44,7 +45,6 @@ export const loader = async ({ request }) => {
         record.items.map((i) => [i.shopifyVariantId, { min: i.minimumQuantity, isStanding: i.isStandingItem }])
       );
       const lineItems = (details?.lineItems?.edges || []).map(({ node }) => ({
-        id: node.id,
         title: node.title,
         variantTitle: node.variant?.title !== "Default Title" ? node.variant?.title ?? "" : "",
         variantId: node.variant?.id ?? null,
@@ -58,7 +58,6 @@ export const loader = async ({ request }) => {
         name: record.shopifyDraftOrderName || `#${record.id}`,
         deliveryDate: record.deliveryDate,
         closeDay: record.standingOrder.closeDay,
-        standingOrderName: record.standingOrder.name,
         lineItems,
       };
     })
@@ -80,20 +79,31 @@ export const action = async ({ request }) => {
   try {
     await authenticate.public.appProxy(request);
   } catch {
-    return htmlResponse(page("Error", `<p class="alert alert-error">Invalid request.</p>`));
+    return new Response(JSON.stringify({ error: "Invalid request" }), {
+      status: 403, headers: { "Content-Type": "application/json" },
+    });
   }
 
+  const formData = await request.formData();
+  const intent = formData.get("intent");
+
+  if (intent === "search-products") {
+    const q = formData.get("q") || "";
+    const results = await searchStorefrontProducts(q);
+    return new Response(JSON.stringify(results), {
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  // update-order
   const url = new URL(request.url);
   const customerId = url.searchParams.get("logged_in_customer_id");
-
   if (!customerId || customerId === "0") {
     return new Response(null, { status: 302, headers: { Location: "/account/login?return_url=/apps/standing-orders" } });
   }
 
-  const formData = await request.formData();
   const recordId = formData.get("recordId");
   const lineItemsJson = formData.get("lineItems");
-
   let lineItems;
   try { lineItems = JSON.parse(lineItemsJson); } catch {
     return new Response(null, { status: 302, headers: { Location: "/apps/standing-orders?error=invalid" } });
@@ -104,69 +114,69 @@ export const action = async ({ request }) => {
 
   try {
     await applyCustomerDraftOrderUpdate(admin, recordId, lineItems);
-  } catch {
+  } catch (err) {
+    console.error("[proxy] update failed:", err.message);
     return new Response(null, { status: 302, headers: { Location: `/apps/standing-orders?error=1` } });
   }
 
   return new Response(null, { status: 302, headers: { Location: `/apps/standing-orders?updated=${recordId}` } });
 };
 
-// ── HTML helpers ────────────────────────────────────────────────────────────
+// ── HTML helpers ─────────────────────────────────────────────────────────────
 
 function orderCard(order, successId) {
-  const subtotal = order.lineItems.reduce((s, l) => s + l.price * l.quantity, 0);
-  const lineItemsJson = JSON.stringify(
-    order.lineItems.filter(l => l.variantId).map(l => ({ variantId: l.variantId, quantity: l.quantity }))
-  ).replace(/"/g, "&quot;");
-
-  const rows = order.lineItems.map((line, idx) => `
-    <tr>
-      <td>
-        <div style="font-weight:500">${escHtml(line.title)}</div>
-        ${line.variantTitle ? `<div style="color:#6d7175;font-size:.8125rem">${escHtml(line.variantTitle)}</div>` : ""}
-        ${line.isStanding ? `<span class="badge badge-standing">Standing item</span>` : ""}
-      </td>
-      <td>
-        <input class="qty-input" type="number" name="qty_${idx}"
-          min="${line.isStanding ? line.min : 1}"
-          value="${line.quantity}"
-          data-variantid="${escHtml(line.variantId ?? "")}"
-          data-min="${line.isStanding ? line.min : 1}"
-          data-standing="${line.isStanding ? "1" : "0"}"
-          ${line.isStanding ? `title="Minimum ${line.min}"` : ""}
-        />
-        ${line.isStanding ? `<div style="font-size:.75rem;color:#6d7175">min ${line.min}</div>` : ""}
-      </td>
-      <td style="text-align:right">$${(line.price * line.quantity).toFixed(2)}</td>
-    </tr>`).join("");
-
+  const itemsJson = escHtml(JSON.stringify(order.lineItems));
   const successBanner = String(successId) === String(order.id)
     ? `<div class="alert alert-success">Order updated successfully.</div>` : "";
 
   return `
-    <div class="card">
+    <div class="card" id="card-${order.id}">
       <div class="order-meta">
         <span>${escHtml(order.name)}</span>
         <span>Delivery: <strong>${order.deliveryDate}</strong></span>
         <span>Deadline: <strong>${DAY_NAMES[order.closeDay]}</strong></span>
       </div>
       ${successBanner}
-      <form method="POST" onsubmit="return validateOrder(this)">
+      <form method="POST" onsubmit="return submitOrder(event, ${order.id})">
+        <input type="hidden" name="intent" value="update-order" />
         <input type="hidden" name="recordId" value="${order.id}" />
-        <input type="hidden" name="lineItems" id="lineItems_${order.id}" value="${lineItemsJson}" />
+        <input type="hidden" name="lineItems" id="li-${order.id}" value="[]" />
         <table>
-          <thead><tr><th>Product</th><th style="width:100px">Qty</th><th style="text-align:right;width:110px">Line total</th></tr></thead>
-          <tbody id="tbody_${order.id}">${rows}</tbody>
-          <tfoot><tr>
-            <td colspan="2" style="text-align:right">Subtotal</td>
-            <td style="text-align:right" id="subtotal_${order.id}">$${subtotal.toFixed(2)}</td>
-          </tr></tfoot>
+          <thead>
+            <tr>
+              <th>Product</th>
+              <th style="width:110px">Qty</th>
+              <th style="text-align:right;width:110px">Line total</th>
+              <th style="width:60px"></th>
+            </tr>
+          </thead>
+          <tbody id="tbody-${order.id}"></tbody>
+          <tfoot>
+            <tr>
+              <td colspan="3" style="text-align:right">Subtotal</td>
+              <td style="text-align:right;font-weight:600" id="subtotal-${order.id}">$0.00</td>
+            </tr>
+          </tfoot>
         </table>
+
+        <div class="add-item-wrap" style="margin-top:1rem;position:relative">
+          <input
+            type="text"
+            class="search-input"
+            placeholder="Search to add a product…"
+            autocomplete="off"
+            oninput="handleSearch(event, ${order.id})"
+            onfocus="handleSearch(event, ${order.id})"
+          />
+          <div class="search-dropdown" id="dropdown-${order.id}" style="display:none"></div>
+        </div>
+
         <div class="actions-row">
           <button type="submit" class="btn btn-primary">Save changes</button>
         </div>
       </form>
-    </div>`;
+    </div>
+    <script>initCard(${order.id}, JSON.parse('${itemsJson.replace(/'/g, "\\'")}'));</script>`;
 }
 
 function page(title, content) {
@@ -186,23 +196,138 @@ function page(title, content) {
   <div class="portal-container">
     ${content}
   </div>
-  <script>
-    function validateOrder(form) {
-      const inputs = form.querySelectorAll('.qty-input');
-      const items = [];
-      for (const input of inputs) {
-        const qty = parseInt(input.value, 10);
-        const min = parseInt(input.dataset.min, 10);
-        if (isNaN(qty) || qty < 1) { alert('Please enter a valid quantity.'); input.focus(); return false; }
-        if (input.dataset.standing === '1' && qty < min) {
-          alert('Quantity for this standing order item cannot go below ' + min + '.'); input.focus(); return false;
-        }
-        if (input.dataset.variantid) items.push({ variantId: input.dataset.variantid, quantity: qty });
-      }
-      form.querySelector('[name="lineItems"]').value = JSON.stringify(items);
-      return true;
+<script>
+var cardState = {};
+var searchTimers = {};
+
+function initCard(recordId, items) {
+  cardState[recordId] = items.map(function(i) { return Object.assign({}, i); });
+  renderTable(recordId);
+}
+
+function renderTable(recordId) {
+  var items = cardState[recordId];
+  var tbody = document.getElementById('tbody-' + recordId);
+  var subtotalEl = document.getElementById('subtotal-' + recordId);
+  var liInput = document.getElementById('li-' + recordId);
+  if (!tbody) return;
+
+  var subtotal = 0;
+  tbody.innerHTML = items.map(function(item, idx) {
+    subtotal += item.price * item.quantity;
+    var minQty = item.isStanding ? item.min : 1;
+    var removeBtn = item.isStanding ? '' :
+      '<button type="button" class="btn-remove" onclick="removeItem(' + recordId + ',\\'' + item.variantId + '\\')">Remove</button>';
+    return '<tr>' +
+      '<td><div style="font-weight:500">' + esc(item.title) + '</div>' +
+        (item.variantTitle ? '<div style="color:#6d7175;font-size:.8125rem">' + esc(item.variantTitle) + '</div>' : '') +
+        (item.isStanding ? '<span class="badge badge-standing">Standing item</span>' : '') +
+      '</td>' +
+      '<td>' +
+        '<input class="qty-input" type="number" min="' + minQty + '" value="' + item.quantity + '" ' +
+          'onchange="updateQty(' + recordId + ',\\'' + item.variantId + '\\', this.value)" />' +
+        (item.isStanding ? '<div style="font-size:.75rem;color:#6d7175">min ' + item.min + '</div>' : '') +
+      '</td>' +
+      '<td style="text-align:right">$' + (item.price * item.quantity).toFixed(2) + '</td>' +
+      '<td>' + removeBtn + '</td>' +
+    '</tr>';
+  }).join('');
+
+  subtotalEl.textContent = '$' + subtotal.toFixed(2);
+  liInput.value = JSON.stringify(
+    items.filter(function(i) { return i.variantId; })
+         .map(function(i) { return { variantId: i.variantId, quantity: i.quantity }; })
+  );
+}
+
+function updateQty(recordId, variantId, val) {
+  var qty = parseInt(val, 10);
+  var items = cardState[recordId];
+  var item = items.find(function(i) { return i.variantId === variantId; });
+  if (!item) return;
+  var min = item.isStanding ? item.min : 1;
+  item.quantity = Math.max(min, isNaN(qty) ? min : qty);
+  renderTable(recordId);
+}
+
+function removeItem(recordId, variantId) {
+  cardState[recordId] = cardState[recordId].filter(function(i) { return i.variantId !== variantId; });
+  renderTable(recordId);
+}
+
+function addItem(recordId, item) {
+  var items = cardState[recordId];
+  if (items.some(function(i) { return i.variantId === item.variantId; })) return;
+  items.push({ title: item.title, variantTitle: item.variantTitle, variantId: item.variantId,
+    price: item.price, quantity: 1, isStanding: false, min: 0 });
+  renderTable(recordId);
+  var dropdown = document.getElementById('dropdown-' + recordId);
+  var input = dropdown.previousElementSibling;
+  dropdown.style.display = 'none';
+  input.value = '';
+}
+
+var searchCache = {};
+function handleSearch(event, recordId) {
+  var q = event.target.value.trim();
+  var dropdown = document.getElementById('dropdown-' + recordId);
+  if (q.length < 2) { dropdown.style.display = 'none'; return; }
+  clearTimeout(searchTimers[recordId]);
+  searchTimers[recordId] = setTimeout(function() {
+    if (searchCache[q]) { showResults(recordId, searchCache[q]); return; }
+    var fd = new FormData();
+    fd.append('intent', 'search-products');
+    fd.append('q', q);
+    fetch(window.location.pathname + window.location.search, { method: 'POST', body: fd })
+      .then(function(r) { return r.json(); })
+      .then(function(results) {
+        searchCache[q] = results;
+        showResults(recordId, results);
+      });
+  }, 300);
+}
+
+function showResults(recordId, products) {
+  var dropdown = document.getElementById('dropdown-' + recordId);
+  var items = [];
+  products.forEach(function(p) {
+    (p.variants || []).forEach(function(v) {
+      var price = v.price && v.price.amount ? v.price.amount : v.price;
+      items.push({ title: p.title, variantTitle: v.title !== 'Default Title' ? v.title : '',
+        variantId: v.id, price: parseFloat(price || 0) });
+    });
+  });
+  if (!items.length) { dropdown.style.display = 'none'; return; }
+  dropdown.innerHTML = items.map(function(item) {
+    var label = esc(item.title) + (item.variantTitle ? ' &mdash; ' + esc(item.variantTitle) : '') +
+      ' <span style="color:#6d7175">$' + item.price.toFixed(2) + '</span>';
+    return '<div class="search-result" onclick="addItem(' + recordId + ',' + JSON.stringify(item).replace(/"/g, '&quot;') + ')">' + label + '</div>';
+  }).join('');
+  dropdown.style.display = 'block';
+}
+
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function submitOrder(event, recordId) {
+  var items = cardState[recordId];
+  for (var i = 0; i < items.length; i++) {
+    var item = items[i];
+    if (item.isStanding && item.quantity < item.min) {
+      alert('Quantity for "' + item.title + '" cannot go below ' + item.min + '.');
+      event.preventDefault(); return false;
     }
-  </script>
+  }
+  return true;
+}
+
+document.addEventListener('click', function(e) {
+  if (!e.target.classList.contains('search-input')) {
+    document.querySelectorAll('.search-dropdown').forEach(function(d) { d.style.display = 'none'; });
+  }
+});
+</script>
 </body>
 </html>`;
 }
@@ -229,7 +354,7 @@ table{width:100%;border-collapse:collapse;font-size:.875rem}
 thead th{text-align:left;padding:.5rem .75rem;background:#f6f6f7;border-bottom:1px solid #e1e3e5;font-weight:500;color:#6d7175;font-size:.8125rem}
 tbody td{padding:.75rem;border-bottom:1px solid #e1e3e5;vertical-align:middle}
 tbody tr:last-child td{border-bottom:none}
-tfoot td{padding:.75rem;font-weight:600}
+tfoot td{padding:.75rem}
 .qty-input{width:72px;padding:.375rem .5rem;border:1px solid #8c9196;border-radius:4px;font-size:.875rem;text-align:center}
 .badge{display:inline-block;padding:.125rem .5rem;border-radius:10px;font-size:.75rem;font-weight:500}
 .badge-standing{background:#e3f1df;color:#0d3b2e}
@@ -239,4 +364,11 @@ tfoot td{padding:.75rem;font-weight:600}
 .btn{display:inline-flex;align-items:center;padding:.5rem 1.125rem;border-radius:4px;font-size:.875rem;font-weight:500;cursor:pointer;border:1px solid transparent}
 .btn-primary{background:#008060;color:#fff}
 .btn-primary:hover{background:#006e52}
+.btn-remove{background:none;border:none;color:#d72c0d;font-size:.8125rem;cursor:pointer;padding:.25rem .5rem}
+.btn-remove:hover{text-decoration:underline}
+.search-input{width:100%;padding:.5rem .75rem;border:1px solid #8c9196;border-radius:4px;font-size:.875rem}
+.search-dropdown{position:absolute;top:100%;left:0;width:100%;background:#fff;border:1px solid #e1e3e5;border-radius:4px;box-shadow:0 4px 12px rgba(0,0,0,.12);max-height:220px;overflow-y:auto;z-index:100}
+.search-result{padding:.5rem .75rem;cursor:pointer;font-size:.875rem;border-bottom:1px solid #f6f6f7}
+.search-result:hover{background:#f6f6f7}
+.search-result:last-child{border-bottom:none}
 `;
