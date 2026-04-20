@@ -8,10 +8,10 @@ const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Frid
 
 function verifySignature(request) {
   const secret = process.env.SHOPIFY_API_SECRET;
-  if (!secret) return false;
-  // Use raw query string so URL-encoded values (e.g. path_prefix=%2F...) match
-  // exactly what Shopify signed — URLSearchParams.get() would decode them first.
   const rawQuery = new URL(request.url).search.slice(1);
+  console.log("[proxy] rawQuery:", rawQuery);
+  console.log("[proxy] secret set:", !!secret, "secret[:4]:", secret?.slice(0, 4));
+  if (!secret) return false;
   let signature = "";
   const parts = rawQuery.split("&").filter((p) => {
     if (p.startsWith("signature=")) { signature = p.slice("signature=".length); return false; }
@@ -19,7 +19,10 @@ function verifySignature(request) {
   });
   if (!signature) return false;
   parts.sort();
-  const digest = crypto.createHmac("sha256", secret).update(parts.join("&")).digest("hex");
+  const message = parts.join("&");
+  const digest = crypto.createHmac("sha256", secret).update(message).digest("hex");
+  console.log("[proxy] message:", message);
+  console.log("[proxy] computed:", digest, "expected:", signature, "match:", digest === signature);
   return digest === signature;
 }
 
