@@ -1,45 +1,24 @@
-import crypto from "crypto";
 import prisma from "../db.server";
-import { unauthenticated } from "../shopify.server";
+import { authenticate, unauthenticated } from "../shopify.server";
 import { getDraftOrderDetails } from "../services/shopify-graphql.server";
 import { applyCustomerDraftOrderUpdate } from "../services/draft-orders.server";
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-
-function verifySignature(request) {
-  const secret = (process.env.SHOPIFY_API_SECRET || "").trim();
-  const rawQuery = new URL(request.url).search.slice(1);
-  console.log("[proxy] rawQuery:", rawQuery);
-  const apiKey = process.env.SHOPIFY_API_KEY || "";
-  console.log("[proxy] secret len:", secret.length, "secret[:4]:", secret.slice(0, 4));
-  console.log("[proxy] api_key[:8]:", apiKey.slice(0, 8));
-  if (!secret) return false;
-  let signature = "";
-  const parts = rawQuery.split("&").filter((p) => {
-    if (p.startsWith("signature=")) { signature = p.slice("signature=".length); return false; }
-    return true;
-  });
-  if (!signature) return false;
-  parts.sort();
-  const message = parts.join("&");
-  const digest = crypto.createHmac("sha256", secret).update(message).digest("hex");
-  console.log("[proxy] message:", message);
-  console.log("[proxy] computed:", digest, "expected:", signature, "match:", digest === signature);
-  return digest === signature;
-}
 
 function toGid(numericId) {
   return `gid://shopify/Customer/${numericId}`;
 }
 
 export const loader = async ({ request }) => {
-  const url = new URL(request.url);
-
-  if (!verifySignature(request)) {
+  try {
+    await authenticate.public.appProxy(request);
+  } catch {
     return htmlResponse(page("Error", `<p class="alert alert-error">Invalid request. Please access this page through the store.</p>`));
   }
 
+  const url = new URL(request.url);
   const customerId = url.searchParams.get("logged_in_customer_id");
+
   if (!customerId || customerId === "0") {
     return htmlResponse(page("Your upcoming orders", `
       <div class="card" style="text-align:center;padding:3rem">
@@ -98,13 +77,15 @@ export const loader = async ({ request }) => {
 };
 
 export const action = async ({ request }) => {
-  const url = new URL(request.url);
-
-  if (!verifySignature(request)) {
+  try {
+    await authenticate.public.appProxy(request);
+  } catch {
     return htmlResponse(page("Error", `<p class="alert alert-error">Invalid request.</p>`));
   }
 
+  const url = new URL(request.url);
   const customerId = url.searchParams.get("logged_in_customer_id");
+
   if (!customerId || customerId === "0") {
     return new Response(null, { status: 302, headers: { Location: "/account/login?return_url=/apps/standing-orders" } });
   }
