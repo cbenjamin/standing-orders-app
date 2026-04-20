@@ -1,4 +1,5 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useLoaderData, useActionData, useNavigation, useNavigate, useFetcher, Form, redirect } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
@@ -93,6 +94,9 @@ export default function EditStandingOrder() {
   const customerFetcher = useFetcher();
   const productFetcher = useFetcher();
 
+  const customerInputRef = useRef(null);
+  const productInputRef = useRef(null);
+
   const [customer, setCustomer] = useState({
     id: order.shopifyCustomerId,
     displayName: order.customerName,
@@ -185,10 +189,10 @@ export default function EditStandingOrder() {
                 <button type="button" onClick={() => setCustomer(null)} style={clearBtnStyle}>Change</button>
               </div>
             ) : (
-              <div style={{ position: "relative" }}>
-                <input style={inputStyle} placeholder="Search by name or email…" value={customerSearch} onChange={(e) => handleCustomerSearch(e.target.value)} autoComplete="off" />
+              <div>
+                <input ref={customerInputRef} style={inputStyle} placeholder="Search by name or email…" value={customerSearch} onChange={(e) => handleCustomerSearch(e.target.value)} autoComplete="off" />
                 {customerResults.length > 0 && (
-                  <DropdownList>
+                  <DropdownList anchorRef={customerInputRef}>
                     {customerResults.map((c) => (
                       <DropdownItem key={c.id} onClick={() => { setCustomer(c); setCustomerSearch(""); }}>
                         <strong>{c.displayName}</strong>
@@ -272,10 +276,10 @@ export default function EditStandingOrder() {
               </tbody>
             </table>
           )}
-          <div style={{ position: "relative" }}>
-            <input style={inputStyle} placeholder="Search products to add…" value={productSearch} onChange={(e) => handleProductSearch(e.target.value)} autoComplete="off" />
+          <div>
+            <input ref={productInputRef} style={inputStyle} placeholder="Search products to add…" value={productSearch} onChange={(e) => handleProductSearch(e.target.value)} autoComplete="off" />
             {productResults.length > 0 && productSearch.length >= 2 && (
-              <DropdownList>
+              <DropdownList anchorRef={productInputRef}>
                 {productResults.flatMap((p) =>
                   p.variants.map((v) => (
                     <DropdownItem key={v.id} onClick={() => addItem(p, v)}>
@@ -307,11 +311,27 @@ export default function EditStandingOrder() {
   );
 }
 
-function DropdownList({ children }) {
-  return (
-    <div style={{ position: "absolute", zIndex: 100, width: "100%", border: "1px solid #e1e3e5", borderRadius: 4, background: "#fff", boxShadow: "0 4px 12px rgba(0,0,0,0.12)", maxHeight: 240, overflowY: "auto" }}>
+function DropdownList({ anchorRef, children }) {
+  const [pos, setPos] = useState({ top: 0, left: 0, width: 0 });
+
+  useEffect(() => {
+    if (anchorRef?.current) {
+      const r = anchorRef.current.getBoundingClientRect();
+      setPos({ top: r.bottom, left: r.left, width: r.width });
+    }
+  });
+
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
+    <div style={{
+      position: "fixed", top: pos.top, left: pos.left, width: pos.width,
+      zIndex: 9999, border: "1px solid #e1e3e5", borderRadius: 4, background: "#fff",
+      boxShadow: "0 4px 12px rgba(0,0,0,0.12)", maxHeight: 240, overflowY: "auto",
+    }}>
       {children}
-    </div>
+    </div>,
+    document.body,
   );
 }
 
