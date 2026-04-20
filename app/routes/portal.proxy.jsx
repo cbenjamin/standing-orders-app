@@ -125,7 +125,7 @@ export const action = async ({ request }) => {
 // ── HTML helpers ─────────────────────────────────────────────────────────────
 
 function orderCard(order, successId) {
-  const itemsJson = escHtml(JSON.stringify(order.lineItems));
+  const itemsJs = JSON.stringify(order.lineItems).replace(/<\/script>/gi, "<\\/script>");
   const successBanner = String(successId) === String(order.id)
     ? `<div class="alert alert-success">Order updated successfully.</div>` : "";
 
@@ -176,7 +176,7 @@ function orderCard(order, successId) {
         </div>
       </form>
     </div>
-    <script>initCard(${order.id}, JSON.parse('${itemsJson.replace(/'/g, "\\'")}'));</script>`;
+    <script>initCard(${order.id}, ${itemsJs});</script>`;
 }
 
 function page(title, content) {
