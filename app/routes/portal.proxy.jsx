@@ -187,15 +187,6 @@ function page(title, content) {
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>${escHtml(title)}</title>
   <style>${CSS}</style>
-</head>
-<body>
-  <header class="portal-header">
-    <h1>${escHtml(title)}</h1>
-    <a href="/account" style="font-size:.875rem;color:#008060;text-decoration:none">← My account</a>
-  </header>
-  <div class="portal-container">
-    ${content}
-  </div>
 <script>
 var cardState = {};
 var searchTimers = {};
@@ -328,6 +319,15 @@ document.addEventListener('click', function(e) {
   }
 });
 </script>
+</head>
+<body>
+  <header class="portal-header">
+    <h1>${escHtml(title)}</h1>
+    <a href="/account" style="font-size:.875rem;color:#008060;text-decoration:none">← My account</a>
+  </header>
+  <div class="portal-container">
+    ${content}
+  </div>
 </body>
 </html>`;
 }
