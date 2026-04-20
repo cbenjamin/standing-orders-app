@@ -86,6 +86,7 @@ function StatusBadge({ status }) {
     active: { background: "#e3f1df", color: "#0d3b2e" },
     paused: { background: "#fff3cd", color: "#7c5501" },
     expired: { background: "#ffd2cc", color: "#7c1a00" },
+    archived: { background: "#e1e3e5", color: "#3d3d3d" },
   };
   const style = styles[status] ?? { background: "#e1e3e5", color: "#3d3d3d" };
   return (

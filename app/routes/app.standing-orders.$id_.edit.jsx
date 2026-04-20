@@ -238,6 +238,7 @@ export default function EditStandingOrder() {
                 <option value="active">Active</option>
                 <option value="paused">Paused</option>
                 <option value="expired">Expired</option>
+                <option value="archived">Archived</option>
               </select>
             </div>
             <div style={{ flex: 1 }} />

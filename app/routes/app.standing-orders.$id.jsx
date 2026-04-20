@@ -23,10 +23,10 @@ export const action = async ({ request, params }) => {
   const formData = await request.formData();
   const intent = formData.get("intent");
 
-  if (intent === "delete") {
+  if (intent === "archive") {
     await prisma.standingOrder.update({
       where: { id: Number(params.id) },
-      data: { status: "expired" },
+      data: { status: "archived" },
     });
     return redirect("/app/standing-orders");
   }
@@ -91,17 +91,17 @@ export default function StandingOrderDetail() {
             </s-button>
           </Form>
           <Form method="POST">
-            <input type="hidden" name="intent" value="delete" />
+            <input type="hidden" name="intent" value="archive" />
             <s-button
               tone="critical"
               disabled={isSubmitting || undefined}
               onClick={(e) => {
-                if (confirm("Mark this standing order as expired? No new draft orders will be created.")) {
+                if (confirm("Archive this standing order? No new draft orders will be created.")) {
                   e.currentTarget.closest("form")?.requestSubmit();
                 }
               }}
             >
-              Delete
+              Archive
             </s-button>
           </Form>
         </div>
@@ -188,6 +188,7 @@ function StatusBadge({ status }) {
     active: { background: "#e3f1df", color: "#0d3b2e" },
     paused: { background: "#fff3cd", color: "#7c5501" },
     expired: { background: "#ffd2cc", color: "#7c1a00" },
+    archived: { background: "#e1e3e5", color: "#3d3d3d" },
   };
   const style = styles[status] ?? { background: "#e1e3e5", color: "#3d3d3d" };
   return (
