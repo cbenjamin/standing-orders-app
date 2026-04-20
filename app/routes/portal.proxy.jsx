@@ -9,6 +9,8 @@ const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Frid
 function verifySignature(searchParams) {
   const secret = process.env.SHOPIFY_API_SECRET;
   const signature = searchParams.get("signature");
+  console.log("[proxy] params:", Object.fromEntries(searchParams.entries()));
+  console.log("[proxy] secret set:", !!secret, "signature present:", !!signature);
   if (!signature || !secret) return false;
   const params = [];
   for (const [k, v] of searchParams.entries()) {
@@ -16,6 +18,7 @@ function verifySignature(searchParams) {
   }
   params.sort();
   const digest = crypto.createHmac("sha256", secret).update(params.join("&")).digest("hex");
+  console.log("[proxy] expected:", digest, "got:", signature, "match:", digest === signature);
   return digest === signature;
 }
 
