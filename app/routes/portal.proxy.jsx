@@ -6,19 +6,20 @@ import { applyCustomerDraftOrderUpdate } from "../services/draft-orders.server";
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
-function verifySignature(searchParams) {
+function verifySignature(request) {
   const secret = process.env.SHOPIFY_API_SECRET;
-  const signature = searchParams.get("signature");
-  console.log("[proxy] params:", Object.fromEntries(searchParams.entries()));
-  console.log("[proxy] secret set:", !!secret, "signature present:", !!signature);
-  if (!signature || !secret) return false;
-  const params = [];
-  for (const [k, v] of searchParams.entries()) {
-    if (k !== "signature") params.push(`${k}=${v}`);
-  }
-  params.sort();
-  const digest = crypto.createHmac("sha256", secret).update(params.join("&")).digest("hex");
-  console.log("[proxy] expected:", digest, "got:", signature, "match:", digest === signature);
+  if (!secret) return false;
+  // Use raw query string so URL-encoded values (e.g. path_prefix=%2F...) match
+  // exactly what Shopify signed — URLSearchParams.get() would decode them first.
+  const rawQuery = new URL(request.url).search.slice(1);
+  let signature = "";
+  const parts = rawQuery.split("&").filter((p) => {
+    if (p.startsWith("signature=")) { signature = p.slice("signature=".length); return false; }
+    return true;
+  });
+  if (!signature) return false;
+  parts.sort();
+  const digest = crypto.createHmac("sha256", secret).update(parts.join("&")).digest("hex");
   return digest === signature;
 }
 
@@ -29,7 +30,7 @@ function toGid(numericId) {
 export const loader = async ({ request }) => {
   const url = new URL(request.url);
 
-  if (!verifySignature(url.searchParams)) {
+  if (!verifySignature(request)) {
     return htmlResponse(page("Error", `<p class="alert alert-error">Invalid request. Please access this page through the store.</p>`));
   }
 
@@ -94,7 +95,7 @@ export const loader = async ({ request }) => {
 export const action = async ({ request }) => {
   const url = new URL(request.url);
 
-  if (!verifySignature(url.searchParams)) {
+  if (!verifySignature(request)) {
     return htmlResponse(page("Error", `<p class="alert alert-error">Invalid request.</p>`));
   }
 
