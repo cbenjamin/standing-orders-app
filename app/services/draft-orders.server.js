@@ -2,7 +2,7 @@ import prisma from "../db.server.js";
 import {
   createDraftOrder,
   updateDraftOrder,
-  completeDraftOrder,
+  createOrderFromDraft,
 } from "./shopify-graphql.server.js";
 
 /** Returns ISO date string (YYYY-MM-DD) for the next occurrence of targetDay (0=Sun…6=Sat), in EST */
@@ -90,8 +90,8 @@ export async function completeDraftOrderRecord(admin, recordId) {
   const record = await prisma.draftOrderRecord.findUnique({ where: { id: recordId } });
   if (!record) throw new Error("Draft order record not found");
 
-  const result = await completeDraftOrder(admin, record.shopifyDraftOrderId);
-  const orderId = result.order?.id || null;
+  const order = await createOrderFromDraft(admin, record.shopifyDraftOrderId);
+  const orderId = order?.id || null;
 
   await prisma.draftOrderRecord.update({
     where: { id: recordId },

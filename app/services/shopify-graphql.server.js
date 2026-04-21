@@ -113,6 +113,65 @@ export async function updateDraftOrder(admin, { draftOrderId, lineItems }) {
   return draftOrder;
 }
 
+export async function createOrderFromDraft(admin, draftOrderId) {
+  // Fetch final line items from the draft order
+  const draft = await getDraftOrderDetails(admin, draftOrderId);
+  if (!draft) throw new Error(`Draft order ${draftOrderId} not found`);
+
+  const lineItems = draft.lineItems.edges.map(({ node }) => ({
+    variantId: node.variant?.id,
+    quantity: node.quantity,
+    title: node.title,
+    originalUnitPrice: node.originalUnitPrice,
+  })).filter((li) => li.variantId); // skip custom lines without a variant
+
+  const response = await admin.graphql(
+    `#graphql
+    mutation OrderCreate($order: OrderCreateOrderInput!, $options: OrderCreateOptionsInput) {
+      orderCreate(order: $order, options: $options) {
+        order { id name }
+        userErrors { field message }
+      }
+    }`,
+    {
+      variables: {
+        order: {
+          customerId: draft.customer?.id,
+          lineItems: lineItems.map((li) => ({
+            variantId: li.variantId,
+            quantity: li.quantity,
+          })),
+          financialStatus: "PENDING",
+          note: draft.note,
+          tags: draft.tags,
+          shippingLines: [{
+            title: "Delivery",
+            priceSet: { shopMoney: { amount: "5.00", currencyCode: "USD" } },
+          }],
+        },
+        options: { sendReceipt: false },
+      },
+    },
+  );
+  const json = await response.json();
+  const { order, userErrors } = json.data.orderCreate;
+  if (userErrors?.length) throw new Error(userErrors.map((e) => e.message).join(", "));
+
+  // Delete the draft order now that we've created the real order
+  await admin.graphql(
+    `#graphql
+    mutation DraftOrderDelete($id: ID!) {
+      draftOrderDelete(input: { id: $id }) {
+        deletedId
+        userErrors { field message }
+      }
+    }`,
+    { variables: { id: draftOrderId } },
+  );
+
+  return order;
+}
+
 export async function completeDraftOrder(admin, draftOrderId) {
   const response = await admin.graphql(
     `#graphql
@@ -135,7 +194,8 @@ export async function getDraftOrderDetails(admin, draftOrderId) {
     `#graphql
     query GetDraftOrder($id: ID!) {
       draftOrder(id: $id) {
-        id name status invoiceUrl
+        id name status invoiceUrl note tags
+        customer { id }
         lineItems(first: 50) {
           edges {
             node {
