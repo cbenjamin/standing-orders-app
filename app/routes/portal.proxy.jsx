@@ -58,6 +58,7 @@ export const loader = async ({ request }) => {
         name: record.shopifyDraftOrderName || `#${record.id}`,
         deliveryDate: record.deliveryDate,
         closeDay: record.standingOrder.closeDay,
+        closeTime: record.standingOrder.closeTime || "12:00",
         locked: record.status === "locked",
         lineItems,
       };
@@ -211,7 +212,7 @@ function orderCard(order, successId, lockedId) {
       <div class="order-meta">
         <span>${escHtml(order.name)} ${lockedBadge}</span>
         <span>Delivery: <strong>${order.deliveryDate}</strong></span>
-        <span>Deadline: <strong>${DAY_NAMES[order.closeDay]}</strong></span>
+        <span>Deadline: <strong>${DAY_NAMES[order.closeDay]} by ${order.closeTime} EST</strong></span>
       </div>
       ${lockedBanner}${successBanner}
       ${formOrReadonly}
@@ -220,13 +221,7 @@ function orderCard(order, successId, lockedId) {
 }
 
 function page(title, content) {
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>${escHtml(title)}</title>
-  <style>${CSS}</style>
+  return `<style>${CSS}</style>
 <script>
 var cardState = {};
 var searchTimers = {};
@@ -359,17 +354,10 @@ document.addEventListener('click', function(e) {
   }
 });
 </script>
-</head>
-<body>
-  <header class="portal-header">
-    <h1>${escHtml(title)}</h1>
-    <a href="/account" style="font-size:.875rem;color:#008060;text-decoration:none">← My account</a>
-  </header>
-  <div class="portal-container">
-    ${content}
-  </div>
-</body>
-</html>`;
+<div class="portal-container">
+  <h1 class="portal-heading">${escHtml(title)}</h1>
+  ${content}
+</div>`;
 }
 
 function escHtml(str) {
@@ -377,14 +365,11 @@ function escHtml(str) {
 }
 
 function htmlResponse(html) {
-  return new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8" } });
+  return new Response(html, { headers: { "Content-Type": "application/liquid" } });
 }
 
 const CSS = `
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f6f6f7;color:#1a1a1a;min-height:100vh}
-.portal-header{background:#fff;border-bottom:1px solid #e1e3e5;padding:1rem 2rem;display:flex;justify-content:space-between;align-items:center}
-.portal-header h1{font-size:1.125rem;font-weight:600}
+.portal-heading{font-size:1.5rem;font-weight:700;margin-bottom:1.5rem}
 .portal-container{max-width:860px;margin:2rem auto;padding:0 1.5rem}
 .card{background:#fff;border:1px solid #e1e3e5;border-radius:8px;padding:1.5rem;margin-bottom:1.5rem}
 .alert{padding:.75rem 1rem;border-radius:4px;margin-bottom:1rem;font-size:.875rem}

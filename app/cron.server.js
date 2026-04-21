@@ -8,6 +8,11 @@ import {
 
 let started = false;
 
+// Returns current date/time in America/New_York (handles DST automatically)
+function getNowEST() {
+  return new Date(new Date().toLocaleString("en-US", { timeZone: "America/New_York" }));
+}
+
 async function getAdminClient() {
   const shop = process.env.SHOPIFY_STORE_DOMAIN;
   if (!shop) throw new Error("SHOPIFY_STORE_DOMAIN is not set");
@@ -44,27 +49,33 @@ export async function runDraftOrderCreator() {
 }
 
 export async function runDraftOrderLocker() {
-  const today = new Date().getDay();
+  const nowEST = getNowEST();
+  const todayDay = nowEST.getDay();
+  const currentTime = `${String(nowEST.getHours()).padStart(2, "0")}:${String(nowEST.getMinutes()).padStart(2, "0")}`;
+
   const records = await prisma.draftOrderRecord.findMany({
-    where: { status: "open", standingOrder: { closeDay: today } },
+    where: { status: "open", standingOrder: { closeDay: todayDay } },
+    include: { standingOrder: true },
   });
 
-  console.log(`[cron] Locking ${records.length} draft orders for cutoff`);
-  for (const record of records) {
+  const due = records.filter((r) => currentTime >= (r.standingOrder.closeTime || "12:00"));
+  console.log(`[cron] Locker: EST ${currentTime} on day ${todayDay} — ${due.length}/${records.length} orders past cutoff`);
+
+  for (const record of due) {
     await prisma.draftOrderRecord.update({
       where: { id: record.id },
       data: { status: "locked" },
     });
-    console.log(`[cron] Locked draft order record ${record.id}`);
+    console.log(`[cron] Locked draft order record ${record.id} (cutoff was ${record.standingOrder.closeTime})`);
   }
 }
 
 export async function runDraftOrderCompleter() {
-  const today = new Date().getDay();
+  const todayDay = getNowEST().getDay();
   const dueRecords = await prisma.draftOrderRecord.findMany({
     where: {
       status: { in: ["open", "locked"] },
-      standingOrder: { closeDay: today },
+      standingOrder: { closeDay: todayDay },
     },
     include: { standingOrder: true },
   });
@@ -87,7 +98,7 @@ export function initCron() {
   started = true;
 
   const createSchedule = process.env.CRON_DRAFT_CREATE || "0 6 * * *";
-  const lockSchedule = process.env.CRON_DRAFT_LOCK || "0 12 * * *";
+  const lockSchedule = process.env.CRON_DRAFT_LOCK || "*/15 * * * *";
   const completeSchedule = process.env.CRON_DRAFT_COMPLETE || "0 21 * * *";
 
   cron.schedule(createSchedule, () => {

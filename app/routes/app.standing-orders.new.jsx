@@ -48,6 +48,7 @@ export const action = async ({ request }) => {
   const endDate = formData.get("endDate");
   const deliveryDay = parseInt(formData.get("deliveryDay"), 10);
   const closeDay = (deliveryDay - 1 + 7) % 7;
+  const closeTime = formData.get("closeTime") || "12:00";
   const itemsJson = formData.get("items");
 
   if (!name || !shopifyCustomerId || !startDate || !endDate || !itemsJson) {
@@ -76,6 +77,7 @@ export const action = async ({ request }) => {
       endDate,
       deliveryDay,
       closeDay,
+      closeTime,
       status: "active",
       items: {
         create: items.map((item) => ({
@@ -267,10 +269,17 @@ export default function NewStandingOrder() {
                 disabled
                 readOnly
               />
+            </div>
+          </div>
+          <div style={{ ...formRowStyle, gap: "1rem" }}>
+            <div style={{ flex: 1 }}>
+              <label style={labelStyle}>Cutoff time (EST) *</label>
+              <input name="closeTime" type="time" style={inputStyle} defaultValue="12:00" required />
               <p style={{ fontSize: "0.8125rem", color: "#6d7175", marginTop: "0.25rem" }}>
-                Draft order locks and converts on this day.
+                Order locks for editing at this time on the deadline day.
               </p>
             </div>
+            <div style={{ flex: 1 }} />
           </div>
         </s-section>
 

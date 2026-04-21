@@ -76,6 +76,7 @@ export default function StandingOrderDetail() {
           <div>
             <InfoRow label="Delivery day" value={DAY_NAMES[order.deliveryDay]} />
             <InfoRow label="Deadline day" value={DAY_NAMES[order.closeDay]} />
+            <InfoRow label="Cutoff time (EST)" value={order.closeTime || "12:00"} />
             <InfoRow label="Date range" value={`${order.startDate} → ${order.endDate}`} />
           </div>
         </div>

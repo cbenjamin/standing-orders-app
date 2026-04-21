@@ -48,6 +48,7 @@ export const action = async ({ request, params }) => {
   const endDate = formData.get("endDate");
   const deliveryDay = parseInt(formData.get("deliveryDay"), 10);
   const closeDay = (deliveryDay - 1 + 7) % 7;
+  const closeTime = formData.get("closeTime") || "12:00";
   const status = formData.get("status");
   const itemsJson = formData.get("items");
 
@@ -66,7 +67,7 @@ export const action = async ({ request, params }) => {
       where: { id: Number(params.id) },
       data: {
         shopifyCustomerId, customerName, customerEmail, name,
-        startDate, endDate, deliveryDay, closeDay,
+        startDate, endDate, deliveryDay, closeDay, closeTime,
         status: status || "active",
         items: {
           create: items.map((item) => ({
@@ -234,6 +235,16 @@ export default function EditStandingOrder() {
               <label style={labelStyle}>Customer deadline (auto)</label>
               <input style={{ ...inputStyle, background: "#f6f6f7", color: "#6d7175" }} value={closeDayLabel} disabled readOnly />
             </div>
+          </div>
+          <div style={{ ...formRowStyle, gap: "1rem" }}>
+            <div style={{ flex: 1 }}>
+              <label style={labelStyle}>Cutoff time (EST) *</label>
+              <input name="closeTime" type="time" style={inputStyle} defaultValue={order.closeTime || "12:00"} required />
+              <p style={{ fontSize: "0.8125rem", color: "#6d7175", marginTop: "0.25rem" }}>
+                Order locks for editing at this time on the deadline day.
+              </p>
+            </div>
+            <div style={{ flex: 1 }} />
           </div>
           <div style={formRowStyle}>
             <div style={{ flex: 1 }}>

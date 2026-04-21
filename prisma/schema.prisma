@@ -43,6 +43,7 @@ model StandingOrder {
   endDate           String
   deliveryDay       Int                  // 0=Sun … 6=Sat
   closeDay          Int                  // day draft locks + converts
+  closeTime         String               @default("12:00") // HH:MM in America/New_York
   status            String               @default("active")
   createdAt         DateTime             @default(now())
   updatedAt         DateTime             @updatedAt
