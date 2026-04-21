@@ -6,7 +6,7 @@ import prisma from "../db.server";
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 export const loader = async ({ request, params }) => {
-  await authenticate.admin(request);
+  const { session } = await authenticate.admin(request);
   const order = await prisma.standingOrder.findUnique({
     where: { id: Number(params.id) },
     include: {
@@ -15,7 +15,7 @@ export const loader = async ({ request, params }) => {
     },
   });
   if (!order) throw new Response("Not Found", { status: 404 });
-  return { order };
+  return { order, shop: session.shop };
 };
 
 export const action = async ({ request, params }) => {
@@ -44,8 +44,13 @@ export const action = async ({ request, params }) => {
   return null;
 };
 
+// "gid://shopify/DraftOrder/123" → "123"
+function gidToId(gid) {
+  return gid?.split("/").pop();
+}
+
 export default function StandingOrderDetail() {
-  const { order } = useLoaderData();
+  const { order, shop } = useLoaderData();
   const navigation = useNavigation();
   const navigate = useNavigate();
   const isSubmitting = navigation.state === "submitting";
@@ -152,7 +157,15 @@ export default function StandingOrderDetail() {
             <tbody>
               {order.draftOrders.map((d) => (
                 <tr key={d.id} style={{ borderBottom: "1px solid #f6f6f7" }}>
-                  <td style={tdStyle}>{d.shopifyDraftOrderName || d.shopifyDraftOrderId}</td>
+                  <td style={tdStyle}>
+                    <a
+                      href={`https://${shop}/admin/draft_orders/${gidToId(d.shopifyDraftOrderId)}`}
+                      target="_blank" rel="noreferrer"
+                      style={adminLinkStyle}
+                    >
+                      {d.shopifyDraftOrderName || d.shopifyDraftOrderId}
+                    </a>
+                  </td>
                   <td style={tdStyle}>{d.deliveryDate}</td>
                   <td style={tdStyle}>
                     <span style={{
@@ -162,8 +175,16 @@ export default function StandingOrderDetail() {
                       {d.status}
                     </span>
                   </td>
-                  <td style={{ ...tdStyle, color: d.completedOrderId ? "#0d3b2e" : "#6d7175" }}>
-                    {d.completedOrderId || "—"}
+                  <td style={tdStyle}>
+                    {d.completedOrderId ? (
+                      <a
+                        href={`https://${shop}/admin/orders/${gidToId(d.completedOrderId)}`}
+                        target="_blank" rel="noreferrer"
+                        style={adminLinkStyle}
+                      >
+                        {d.completedOrderId}
+                      </a>
+                    ) : "—"}
                   </td>
                 </tr>
               ))}
@@ -202,5 +223,6 @@ function StatusBadge({ status }) {
 const tableStyle = { width: "100%", borderCollapse: "collapse", fontSize: "0.875rem" };
 const thStyle = { padding: "0.5rem 0.75rem", textAlign: "left", color: "#6d7175", fontWeight: 500 };
 const tdStyle = { padding: "0.625rem 0.75rem" };
+const adminLinkStyle = { color: "#008060", fontWeight: 500, textDecoration: "none" };
 
 export const headers = (headersArgs) => boundary.headers(headersArgs);
