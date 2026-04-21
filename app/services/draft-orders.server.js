@@ -87,22 +87,41 @@ export async function applyCustomerDraftOrderUpdate(admin, draftOrderRecordId, l
 }
 
 export async function completeDraftOrderRecord(admin, recordId) {
-  const record = await prisma.draftOrderRecord.findUnique({
-    where: { id: recordId },
-    include: { standingOrder: true },
+  // Claim the record immediately to prevent concurrent runs from processing it twice
+  const claimed = await prisma.draftOrderRecord.updateMany({
+    where: { id: recordId, status: { in: ["open", "locked"] } },
+    data: { status: "processing" },
   });
-  if (!record) throw new Error("Draft order record not found");
+  if (claimed.count === 0) {
+    // Another run already claimed it
+    return null;
+  }
 
-  const tags = ["standing-order", `standing-order-id:${record.standingOrderId}`];
-  const note = `Standing Order: ${record.standingOrder.name} | Delivery: ${record.deliveryDate}`;
+  let record;
+  try {
+    record = await prisma.draftOrderRecord.findUnique({
+      where: { id: recordId },
+      include: { standingOrder: true },
+    });
 
-  const order = await createOrderFromDraft(admin, record.shopifyDraftOrderId, { tags, note });
-  const orderId = order?.id || null;
-  const orderName = order?.name || null;
+    const tags = ["standing-order", `standing-order-id:${record.standingOrderId}`];
+    const note = `Standing Order: ${record.standingOrder.name} | Delivery: ${record.deliveryDate}`;
 
-  await prisma.draftOrderRecord.update({
-    where: { id: recordId },
-    data: { status: "completed", completedOrderId: orderId, completedOrderName: orderName },
-  });
-  return orderId;
+    const order = await createOrderFromDraft(admin, record.shopifyDraftOrderId, { tags, note });
+    const orderId = order?.id || null;
+    const orderName = order?.name || null;
+
+    await prisma.draftOrderRecord.update({
+      where: { id: recordId },
+      data: { status: "completed", completedOrderId: orderId, completedOrderName: orderName },
+    });
+    return orderId;
+  } catch (err) {
+    // Roll back to locked so it can be retried
+    await prisma.draftOrderRecord.update({
+      where: { id: recordId },
+      data: { status: "locked" },
+    });
+    throw err;
+  }
 }
