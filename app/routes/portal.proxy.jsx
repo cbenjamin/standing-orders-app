@@ -370,7 +370,7 @@ function htmlResponse(html) {
 
 const CSS = `
 .portal-heading{font-size:1.5rem;font-weight:700;margin-bottom:1.5rem}
-.portal-container{max-width:860px;margin:2rem auto;padding:0 1.5rem}
+.portal-container{max-width:1200px;margin:2rem auto;padding:0 1.5rem}
 .card{background:#fff;border:1px solid #e1e3e5;border-radius:8px;padding:1.5rem;margin-bottom:1.5rem}
 .alert{padding:.75rem 1rem;border-radius:4px;margin-bottom:1rem;font-size:.875rem}
 .alert-error{background:#fff4f4;border:1px solid #ffd2cc;color:#d72c0d}
