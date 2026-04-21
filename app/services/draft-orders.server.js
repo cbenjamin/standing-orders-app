@@ -5,13 +5,15 @@ import {
   completeDraftOrder,
 } from "./shopify-graphql.server.js";
 
-/** Returns ISO date string for the next occurrence of targetDay (0=Sun…6=Sat) */
+/** Returns ISO date string (YYYY-MM-DD) for the next occurrence of targetDay (0=Sun…6=Sat), in EST */
 export function nextWeekday(targetDay) {
-  const d = new Date();
-  const diff = (targetDay - d.getDay() + 7) % 7;
-  // If today IS the target day, schedule for next week (don't create same-day)
-  d.setDate(d.getDate() + (diff === 0 ? 7 : diff));
-  return d.toISOString().slice(0, 10);
+  const nowEST = new Date(new Date().toLocaleString("en-US", { timeZone: "America/New_York" }));
+  const diff = (targetDay - nowEST.getDay() + 7) % 7;
+  nowEST.setDate(nowEST.getDate() + (diff === 0 ? 7 : diff));
+  const y = nowEST.getFullYear();
+  const m = String(nowEST.getMonth() + 1).padStart(2, "0");
+  const d = String(nowEST.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 }
 
 export async function createDraftOrderForStandingOrder(admin, standingOrder) {
