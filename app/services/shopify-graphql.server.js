@@ -113,7 +113,7 @@ export async function updateDraftOrder(admin, { draftOrderId, lineItems }) {
   return draftOrder;
 }
 
-export async function createOrderFromDraft(admin, draftOrderId) {
+export async function createOrderFromDraft(admin, draftOrderId, { tags = [], note = "" } = {}) {
   // Fetch final line items from the draft order
   const draft = await getDraftOrderDetails(admin, draftOrderId);
   if (!draft) throw new Error(`Draft order ${draftOrderId} not found`);
@@ -142,6 +142,8 @@ export async function createOrderFromDraft(admin, draftOrderId) {
             quantity: li.quantity,
           })),
           financialStatus: "PENDING",
+          note,
+          tags,
           shippingLines: [{
             title: "Delivery",
             priceSet: { shopMoney: { amount: "5.00", currencyCode: "USD" } },

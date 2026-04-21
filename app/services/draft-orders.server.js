@@ -87,10 +87,16 @@ export async function applyCustomerDraftOrderUpdate(admin, draftOrderRecordId, l
 }
 
 export async function completeDraftOrderRecord(admin, recordId) {
-  const record = await prisma.draftOrderRecord.findUnique({ where: { id: recordId } });
+  const record = await prisma.draftOrderRecord.findUnique({
+    where: { id: recordId },
+    include: { standingOrder: true },
+  });
   if (!record) throw new Error("Draft order record not found");
 
-  const order = await createOrderFromDraft(admin, record.shopifyDraftOrderId);
+  const tags = ["standing-order", `standing-order-id:${record.standingOrderId}`];
+  const note = `Standing Order: ${record.standingOrder.name} | Delivery: ${record.deliveryDate}`;
+
+  const order = await createOrderFromDraft(admin, record.shopifyDraftOrderId, { tags, note });
   const orderId = order?.id || null;
 
   await prisma.draftOrderRecord.update({
