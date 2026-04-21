@@ -355,7 +355,7 @@ function DropdownItem({ onClick, children }) {
 }
 
 const labelStyle = { display: "block", fontSize: "0.875rem", fontWeight: 500, marginBottom: "0.375rem" };
-const inputStyle = { width: "100%", padding: "0.5rem 0.75rem", border: "1px solid #8c9196", borderRadius: 4, fontSize: "0.9375rem", background: "#fff", boxSizing: "border-box" };
+const inputStyle = { width: "100%", padding: "0.5rem 0.75rem", border: "1px solid #8c9196", borderRadius: 4, fontSize: "0.9375rem", background: "#fff", boxSizing: "border-box", fontFamily: "inherit" };
 const formRowStyle = { display: "flex", flexWrap: "wrap", marginBottom: "0.75rem" };
 const fieldColStyle = { flex: "1 1 200px", minWidth: 0 };
 const clearBtnStyle = { background: "none", border: "none", cursor: "pointer", color: "#008060", fontSize: "0.875rem", padding: 0 };
