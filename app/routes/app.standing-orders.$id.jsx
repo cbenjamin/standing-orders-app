@@ -158,13 +158,17 @@ export default function StandingOrderDetail() {
               {order.draftOrders.map((d) => (
                 <tr key={d.id} style={{ borderBottom: "1px solid #f6f6f7" }}>
                   <td style={tdStyle}>
-                    <a
-                      href={`https://${shop}/admin/draft_orders/${gidToId(d.shopifyDraftOrderId)}`}
-                      target="_blank" rel="noreferrer"
-                      style={adminLinkStyle}
-                    >
-                      {d.shopifyDraftOrderName || d.shopifyDraftOrderId}
-                    </a>
+                    {d.status === "completed" ? (
+                      <span style={{ color: "#6d7175" }}>{d.shopifyDraftOrderName || "—"}</span>
+                    ) : (
+                      <a
+                        href={`https://${shop}/admin/draft_orders/${gidToId(d.shopifyDraftOrderId)}`}
+                        target="_blank" rel="noreferrer"
+                        style={adminLinkStyle}
+                      >
+                        {d.shopifyDraftOrderName || d.shopifyDraftOrderId}
+                      </a>
+                    )}
                   </td>
                   <td style={tdStyle}>{d.deliveryDate}</td>
                   <td style={tdStyle}>
@@ -182,7 +186,7 @@ export default function StandingOrderDetail() {
                         target="_blank" rel="noreferrer"
                         style={adminLinkStyle}
                       >
-                        {d.completedOrderId}
+                        {d.completedOrderName || d.completedOrderId}
                       </a>
                     ) : "—"}
                   </td>

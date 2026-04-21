@@ -98,10 +98,11 @@ export async function completeDraftOrderRecord(admin, recordId) {
 
   const order = await createOrderFromDraft(admin, record.shopifyDraftOrderId, { tags, note });
   const orderId = order?.id || null;
+  const orderName = order?.name || null;
 
   await prisma.draftOrderRecord.update({
     where: { id: recordId },
-    data: { status: "completed", completedOrderId: orderId },
+    data: { status: "completed", completedOrderId: orderId, completedOrderName: orderName },
   });
   return orderId;
 }

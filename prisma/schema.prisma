@@ -72,6 +72,7 @@ model DraftOrderRecord {
   status                String           @default("open")
   createdAt             DateTime         @default(now())
   completedOrderId      String?
+  completedOrderName    String?
   items                 DraftOrderItem[]
 }
 
