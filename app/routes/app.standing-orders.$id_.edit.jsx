@@ -348,7 +348,7 @@ function DropdownList({ anchorRef, children }) {
 
 function DropdownItem({ onClick, children }) {
   return (
-    <div onClick={onClick} style={{ padding: "0.5rem 0.75rem", cursor: "pointer", borderBottom: "1px solid #f6f6f7", fontSize: "0.875rem" }} onMouseEnter={(e) => (e.currentTarget.style.background = "#f6f6f7")} onMouseLeave={(e) => (e.currentTarget.style.background = "")}>
+    <div onClick={onClick} style={{ padding: "0.5rem 0.75rem", cursor: "pointer", borderBottom: "1px solid #f6f6f7", fontSize: "0.875rem", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }} onMouseEnter={(e) => (e.currentTarget.style.background = "#f6f6f7")} onMouseLeave={(e) => (e.currentTarget.style.background = "")}>
       {children}
     </div>
   );
