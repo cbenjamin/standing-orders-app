@@ -142,8 +142,6 @@ export async function createOrderFromDraft(admin, draftOrderId) {
             quantity: li.quantity,
           })),
           financialStatus: "PENDING",
-          note: draft.note,
-          tags: draft.tags,
           shippingLines: [{
             title: "Delivery",
             priceSet: { shopMoney: { amount: "5.00", currencyCode: "USD" } },
@@ -194,7 +192,7 @@ export async function getDraftOrderDetails(admin, draftOrderId) {
     `#graphql
     query GetDraftOrder($id: ID!) {
       draftOrder(id: $id) {
-        id name status invoiceUrl note tags
+        id name status invoiceUrl
         customer { id }
         lineItems(first: 50) {
           edges {
