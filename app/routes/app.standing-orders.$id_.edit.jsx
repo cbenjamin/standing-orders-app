@@ -183,7 +183,7 @@ export default function EditStandingOrder() {
             <label style={labelStyle}>Customer *</label>
             {customer ? (
               <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.625rem", border: "1px solid #e1e3e5", borderRadius: 4 }}>
-                <div style={{ flex: 1 }}>
+                <div style={fieldColStyle}>
                   <strong>{customer.displayName}</strong>
                   <span style={{ color: "#6d7175", marginLeft: "0.5rem", fontSize: "0.875rem" }}>{customer.email}</span>
                 </div>
@@ -209,35 +209,35 @@ export default function EditStandingOrder() {
 
         <s-section heading="Order details">
           <div style={formRowStyle}>
-            <div style={{ flex: 1 }}>
+            <div style={fieldColStyle}>
               <label style={labelStyle}>Standing order name *</label>
               <input name="name" style={inputStyle} defaultValue={order.name} required />
             </div>
           </div>
           <div style={{ ...formRowStyle, gap: "1rem" }}>
-            <div style={{ flex: 1 }}>
+            <div style={fieldColStyle}>
               <label style={labelStyle}>Start date *</label>
               <input name="startDate" type="date" style={inputStyle} defaultValue={order.startDate} required />
             </div>
-            <div style={{ flex: 1 }}>
+            <div style={fieldColStyle}>
               <label style={labelStyle}>End date *</label>
               <input name="endDate" type="date" style={inputStyle} defaultValue={order.endDate} required />
             </div>
           </div>
           <div style={{ ...formRowStyle, gap: "1rem" }}>
-            <div style={{ flex: 1 }}>
+            <div style={fieldColStyle}>
               <label style={labelStyle}>Delivery day *</label>
               <select name="deliveryDay" style={inputStyle} value={deliveryDay} onChange={(e) => setDeliveryDay(e.target.value)}>
                 {DAY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </div>
-            <div style={{ flex: 1 }}>
+            <div style={fieldColStyle}>
               <label style={labelStyle}>Customer deadline (auto)</label>
               <input style={{ ...inputStyle, background: "#f6f6f7", color: "#6d7175" }} value={closeDayLabel} disabled readOnly />
             </div>
           </div>
           <div style={{ ...formRowStyle, gap: "1rem" }}>
-            <div style={{ flex: 1 }}>
+            <div style={fieldColStyle}>
               <label style={labelStyle}>Cutoff time (EST) *</label>
               <input name="closeTime" type="time" style={inputStyle} defaultValue={order.closeTime || "12:00"} required />
               <p style={{ fontSize: "0.8125rem", color: "#6d7175", marginTop: "0.25rem" }}>
@@ -247,7 +247,7 @@ export default function EditStandingOrder() {
             <div style={{ flex: 1 }} />
           </div>
           <div style={formRowStyle}>
-            <div style={{ flex: 1 }}>
+            <div style={fieldColStyle}>
               <label style={labelStyle}>Status</label>
               <select name="status" style={inputStyle} defaultValue={order.status}>
                 <option value="active">Active</option>
@@ -355,8 +355,9 @@ function DropdownItem({ onClick, children }) {
 }
 
 const labelStyle = { display: "block", fontSize: "0.875rem", fontWeight: 500, marginBottom: "0.375rem" };
-const inputStyle = { width: "100%", padding: "0.5rem 0.75rem", border: "1px solid #8c9196", borderRadius: 4, fontSize: "0.9375rem", background: "#fff" };
-const formRowStyle = { display: "flex", marginBottom: "0.75rem" };
+const inputStyle = { width: "100%", padding: "0.5rem 0.75rem", border: "1px solid #8c9196", borderRadius: 4, fontSize: "0.9375rem", background: "#fff", boxSizing: "border-box" };
+const formRowStyle = { display: "flex", flexWrap: "wrap", marginBottom: "0.75rem" };
+const fieldColStyle = { flex: "1 1 200px", minWidth: 0 };
 const clearBtnStyle = { background: "none", border: "none", cursor: "pointer", color: "#008060", fontSize: "0.875rem", padding: 0 };
 
 export const headers = (headersArgs) => boundary.headers(headersArgs);
