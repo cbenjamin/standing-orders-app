@@ -70,9 +70,18 @@ export async function runDraftOrderLocker() {
   }
 }
 
+function addOneHour(timeStr) {
+  const [h, m] = timeStr.split(":").map(Number);
+  const newH = (h + 1) % 24;
+  return `${String(newH).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
 export async function runDraftOrderCompleter() {
-  const todayDay = getNowEST().getDay();
-  const dueRecords = await prisma.draftOrderRecord.findMany({
+  const nowEST = getNowEST();
+  const todayDay = nowEST.getDay();
+  const currentTime = `${String(nowEST.getHours()).padStart(2, "0")}:${String(nowEST.getMinutes()).padStart(2, "0")}`;
+
+  const records = await prisma.draftOrderRecord.findMany({
     where: {
       status: { in: ["open", "locked"] },
       standingOrder: { closeDay: todayDay },
@@ -80,10 +89,13 @@ export async function runDraftOrderCompleter() {
     include: { standingOrder: true },
   });
 
-  console.log(`[cron] Completing ${dueRecords.length} draft orders due today`);
+  const due = records.filter((r) => currentTime >= addOneHour(r.standingOrder.closeTime || "12:00"));
+  console.log(`[cron] Completer: EST ${currentTime} on day ${todayDay} — ${due.length}/${records.length} orders past convert time`);
+
+  if (!due.length) return;
   const admin = await getAdminClient();
 
-  for (const record of dueRecords) {
+  for (const record of due) {
     try {
       const orderId = await completeDraftOrderRecord(admin, record.id);
       console.log(`[cron] Completed ${record.shopifyDraftOrderName} → order ${orderId}`);
@@ -99,7 +111,7 @@ export function initCron() {
 
   const createSchedule = process.env.CRON_DRAFT_CREATE || "0 6 * * *";
   const lockSchedule = process.env.CRON_DRAFT_LOCK || "*/15 * * * *";
-  const completeSchedule = process.env.CRON_DRAFT_COMPLETE || "0 21 * * *";
+  const completeSchedule = process.env.CRON_DRAFT_COMPLETE || "*/15 * * * *";
 
   cron.schedule(createSchedule, () => {
     console.log("[cron] Running draft order creation job");
