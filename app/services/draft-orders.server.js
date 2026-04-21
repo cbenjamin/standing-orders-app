@@ -17,6 +17,9 @@ export function nextWeekday(targetDay) {
 export async function createDraftOrderForStandingOrder(admin, standingOrder) {
   const deliveryDate = nextWeekday(standingOrder.deliveryDay);
 
+  // Don't create a draft if the delivery date falls after the standing order ends
+  if (deliveryDate > standingOrder.endDate) return null;
+
   const existing = await prisma.draftOrderRecord.findFirst({
     where: { standingOrderId: standingOrder.id, deliveryDate },
   });
