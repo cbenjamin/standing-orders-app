@@ -369,32 +369,32 @@ function htmlResponse(html) {
 }
 
 const CSS = `
-.portal-heading{font-size:1.5rem;font-weight:700;margin-bottom:1.5rem}
-.portal-container{max-width:1200px;margin:2rem auto;padding:0 1.5rem}
-.card{background:#fff;border:1px solid #e1e3e5;border-radius:8px;padding:1.5rem;margin-bottom:1.5rem}
-.alert{padding:.75rem 1rem;border-radius:4px;margin-bottom:1rem;font-size:.875rem}
+.portal-container{max-width:1200px;margin:32px auto;padding:0 24px;font-size:16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1a1a1a}
+.portal-heading{font-size:24px;font-weight:700;margin-bottom:24px}
+.card{background:#fff;border:1px solid #e1e3e5;border-radius:8px;padding:24px;margin-bottom:24px}
+.alert{padding:12px 16px;border-radius:4px;margin-bottom:16px;font-size:14px}
 .alert-error{background:#fff4f4;border:1px solid #ffd2cc;color:#d72c0d}
 .alert-success{background:#f1f8f5;border:1px solid #95c9b4;color:#0d3b2e}
 .alert-warning{background:#fff9e6;border:1px solid #ffd369;color:#7c5501}
-table{width:100%;border-collapse:collapse;font-size:.875rem}
-thead th{text-align:left;padding:.5rem .75rem;background:#f6f6f7;border-bottom:1px solid #e1e3e5;font-weight:500;color:#6d7175;font-size:.8125rem}
-tbody td{padding:.75rem;border-bottom:1px solid #e1e3e5;vertical-align:middle}
-tbody tr:last-child td{border-bottom:none}
-tfoot td{padding:.75rem}
-.qty-input{width:72px;padding:.375rem .5rem;border:1px solid #8c9196;border-radius:4px;font-size:.875rem;text-align:center}
-.badge{display:inline-block;padding:.125rem .5rem;border-radius:10px;font-size:.75rem;font-weight:500}
+.portal-container table{width:100%;border-collapse:collapse;font-size:14px}
+.portal-container thead th{text-align:left;padding:8px 12px;background:#f6f6f7;border-bottom:1px solid #e1e3e5;font-weight:500;color:#6d7175;font-size:13px}
+.portal-container tbody td{padding:12px;border-bottom:1px solid #e1e3e5;vertical-align:middle}
+.portal-container tbody tr:last-child td{border-bottom:none}
+.portal-container tfoot td{padding:12px}
+.qty-input{width:72px;padding:6px 8px;border:1px solid #8c9196;border-radius:4px;font-size:14px;text-align:center;font-family:inherit}
+.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:12px;font-weight:500}
 .badge-standing{background:#e3f1df;color:#0d3b2e}
-.order-meta{display:flex;gap:1.5rem;color:#6d7175;font-size:.875rem;margin-bottom:1rem;flex-wrap:wrap}
+.order-meta{display:flex;gap:24px;color:#6d7175;font-size:14px;margin-bottom:16px;flex-wrap:wrap}
 .order-meta strong{color:#1a1a1a}
-.actions-row{display:flex;justify-content:flex-end;margin-top:1rem}
-.btn{display:inline-flex;align-items:center;padding:.5rem 1.125rem;border-radius:4px;font-size:.875rem;font-weight:500;cursor:pointer;border:1px solid transparent}
+.actions-row{display:flex;justify-content:flex-end;margin-top:16px}
+.btn{display:inline-flex;align-items:center;padding:8px 18px;border-radius:4px;font-size:14px;font-weight:500;cursor:pointer;border:1px solid transparent;font-family:inherit}
 .btn-primary{background:#008060;color:#fff}
 .btn-primary:hover{background:#006e52}
-.btn-remove{background:none;border:none;color:#d72c0d;font-size:.8125rem;cursor:pointer;padding:.25rem .5rem}
+.btn-remove{background:none;border:none;color:#d72c0d;font-size:13px;cursor:pointer;padding:4px 8px;font-family:inherit}
 .btn-remove:hover{text-decoration:underline}
-.search-input{width:100%;padding:.5rem .75rem;border:1px solid #8c9196;border-radius:4px;font-size:.875rem}
+.search-input{width:100%;padding:8px 12px;border:1px solid #8c9196;border-radius:4px;font-size:14px;font-family:inherit;box-sizing:border-box}
 .search-dropdown{position:absolute;top:100%;left:0;width:100%;background:#fff;border:1px solid #e1e3e5;border-radius:4px;box-shadow:0 4px 12px rgba(0,0,0,.12);max-height:220px;overflow-y:auto;z-index:100}
-.search-result{padding:.5rem .75rem;cursor:pointer;font-size:.875rem;border-bottom:1px solid #f6f6f7}
+.search-result{padding:8px 12px;cursor:pointer;font-size:14px;border-bottom:1px solid #f6f6f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif}
 .search-result:hover{background:#f6f6f7}
 .search-result:last-child{border-bottom:none}
 `;
