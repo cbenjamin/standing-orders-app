@@ -113,9 +113,29 @@ export async function updateDraftOrder(admin, { draftOrderId, lineItems }) {
   return draftOrder;
 }
 
+async function getFulfillmentPaymentTermsTemplateId(admin) {
+  const response = await admin.graphql(
+    `#graphql
+    query {
+      paymentTermsTemplates {
+        id
+        paymentTermsType
+      }
+    }`,
+  );
+  const json = await response.json();
+  const template = json.data.paymentTermsTemplates.find(
+    (t) => t.paymentTermsType === "FULFILLMENT",
+  );
+  return template?.id || null;
+}
+
 export async function createOrderFromDraft(admin, draftOrderId, { tags = [], note = "" } = {}) {
-  // Fetch final line items from the draft order
-  const draft = await getDraftOrderDetails(admin, draftOrderId);
+  // Fetch final line items from the draft order and payment terms template in parallel
+  const [draft, paymentTermsTemplateId] = await Promise.all([
+    getDraftOrderDetails(admin, draftOrderId),
+    getFulfillmentPaymentTermsTemplateId(admin),
+  ]);
   if (!draft) throw new Error(`Draft order ${draftOrderId} not found`);
 
   const lineItems = draft.lineItems.edges.map(({ node }) => ({
@@ -148,6 +168,9 @@ export async function createOrderFromDraft(admin, draftOrderId, { tags = [], not
             title: "Delivery",
             priceSet: { shopMoney: { amount: "5.00", currencyCode: "USD" } },
           }],
+          ...(paymentTermsTemplateId && {
+            paymentTerms: { paymentTermsTemplateId },
+          }),
         },
         options: { sendReceipt: false },
       },
