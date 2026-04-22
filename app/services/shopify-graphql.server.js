@@ -131,11 +131,7 @@ async function getFulfillmentPaymentTermsTemplateId(admin) {
 }
 
 export async function createOrderFromDraft(admin, draftOrderId, { tags = [], note = "" } = {}) {
-  // Fetch final line items from the draft order and payment terms template in parallel
-  const [draft, paymentTermsTemplateId] = await Promise.all([
-    getDraftOrderDetails(admin, draftOrderId),
-    getFulfillmentPaymentTermsTemplateId(admin),
-  ]);
+  const draft = await getDraftOrderDetails(admin, draftOrderId);
   if (!draft) throw new Error(`Draft order ${draftOrderId} not found`);
 
   const lineItems = draft.lineItems.edges.map(({ node }) => ({
@@ -168,9 +164,6 @@ export async function createOrderFromDraft(admin, draftOrderId, { tags = [], not
             title: "Delivery",
             priceSet: { shopMoney: { amount: "5.00", currencyCode: "USD" } },
           }],
-          ...(paymentTermsTemplateId && {
-            paymentTerms: { paymentTermsTemplateId },
-          }),
         },
         options: { sendReceipt: false },
       },
