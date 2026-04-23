@@ -57,11 +57,14 @@ export async function createDraftOrder(admin, { customerId, lineItems, note, tag
       variables: {
         input: {
           customerId,
-          lineItems: lineItems.map((li) => ({
-            variantId: li.variantId,
-            quantity: li.quantity,
-            ...(li.price ? { originalUnitPrice: String(li.price) } : {}),
-          })),
+          lineItems: lineItems.map((li) => {
+            const item = { variantId: li.variantId, quantity: li.quantity };
+            if (li.price != null) {
+              item.originalUnitPrice = parseFloat(li.price).toFixed(2);
+              console.log(`[shopify] draftOrderCreate line item variantId=${li.variantId} originalUnitPrice=${item.originalUnitPrice}`);
+            }
+            return item;
+          }),
           note,
           tags,
           shippingLine: { title: "Delivery", price: "5.00" },
@@ -158,6 +161,12 @@ export async function createOrderFromDraft(admin, draftOrderId, { tags = [], not
           lineItems: lineItems.map((li) => ({
             variantId: li.variantId,
             quantity: li.quantity,
+            priceSet: {
+              shopMoney: {
+                amount: parseFloat(li.originalUnitPrice).toFixed(2),
+                currencyCode: "USD",
+              },
+            },
           })),
           financialStatus: "PENDING",
           note,
