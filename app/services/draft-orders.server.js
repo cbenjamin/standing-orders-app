@@ -115,18 +115,31 @@ export async function applyCustomerDraftOrderUpdate(admin, draftOrderRecordId, l
     }
   }
 
-  // Fetch current draft to preserve custom prices set at creation
+  // Fetch current draft to re-apply any standing order price discounts
   const draft = await getDraftOrderDetails(admin, record.shopifyDraftOrderId);
   const priceMap = {};
   for (const { node } of draft.lineItems.edges) {
-    if (node.variant?.id) priceMap[node.variant.id] = node.originalUnitPrice;
+    if (node.variant?.id) {
+      priceMap[node.variant.id] = {
+        regularPrice: parseFloat(node.originalUnitPrice || 0),
+        discountedPrice: parseFloat(node.discountedUnitPrice || node.originalUnitPrice || 0),
+      };
+    }
   }
 
-  const lineItemsWithPrices = lineItems.map((li) => ({
-    variantId: li.variantId,
-    quantity: li.quantity,
-    ...(priceMap[li.variantId] ? { originalUnitPrice: priceMap[li.variantId] } : {}),
-  }));
+  const lineItemsWithPrices = lineItems.map((li) => {
+    const prices = priceMap[li.variantId];
+    const item = { variantId: li.variantId, quantity: li.quantity };
+    if (prices && prices.discountedPrice < prices.regularPrice) {
+      const discountAmount = parseFloat((prices.regularPrice - prices.discountedPrice).toFixed(2));
+      item.appliedDiscount = {
+        valueType: "FIXED_AMOUNT",
+        value: discountAmount,
+        title: "Standing order price",
+      };
+    }
+    return item;
+  });
 
   return updateDraftOrder(admin, {
     draftOrderId: record.shopifyDraftOrderId,

@@ -124,7 +124,7 @@ export async function updateDraftOrder(admin, { draftOrderId, lineItems }) {
           lineItems: lineItems.map((li) => ({
             variantId: li.variantId,
             quantity: li.quantity,
-            ...(li.originalUnitPrice ? { originalUnitPrice: String(li.originalUnitPrice) } : {}),
+            ...(li.appliedDiscount ? { appliedDiscount: li.appliedDiscount } : {}),
           })),
         },
       },
