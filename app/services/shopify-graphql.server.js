@@ -154,7 +154,10 @@ async function getFulfillmentPaymentTermsTemplateId(admin) {
 }
 
 export async function createOrderFromDraft(admin, draftOrderId, { tags = [], note = "" } = {}) {
-  const draft = await getDraftOrderDetails(admin, draftOrderId);
+  const [draft, paymentTermsTemplateId] = await Promise.all([
+    getDraftOrderDetails(admin, draftOrderId),
+    getFulfillmentPaymentTermsTemplateId(admin),
+  ]);
   if (!draft) throw new Error(`Draft order ${draftOrderId} not found`);
 
   const lineItems = draft.lineItems.edges.map(({ node }) => ({
@@ -201,6 +204,32 @@ export async function createOrderFromDraft(admin, draftOrderId, { tags = [], not
   const json = await response.json();
   const { order, userErrors } = json.data.orderCreate;
   if (userErrors?.length) throw new Error(userErrors.map((e) => e.message).join(", "));
+
+  // Set payment terms to "due on fulfillment"
+  if (order?.id && paymentTermsTemplateId) {
+    try {
+      const ptResponse = await admin.graphql(
+        `#graphql
+        mutation PaymentTermsCreate($referenceId: ID!, $paymentTermsAttributes: PaymentTermsCreateInput!) {
+          paymentTermsCreate(referenceId: $referenceId, paymentTermsAttributes: $paymentTermsAttributes) {
+            paymentTerms { id paymentTermsType }
+            userErrors { field message }
+          }
+        }`,
+        {
+          variables: {
+            referenceId: order.id,
+            paymentTermsAttributes: { paymentTermsTemplateId },
+          },
+        },
+      );
+      const ptJson = await ptResponse.json();
+      const ptErrors = ptJson.data?.paymentTermsCreate?.userErrors;
+      if (ptErrors?.length) console.error("[shopify] paymentTermsCreate errors:", ptErrors);
+    } catch (err) {
+      console.error("[shopify] paymentTermsCreate failed:", err.message);
+    }
+  }
 
   // Delete the draft order now that we've created the real order
   await admin.graphql(
