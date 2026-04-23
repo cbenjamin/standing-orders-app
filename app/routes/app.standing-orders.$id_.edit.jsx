@@ -50,6 +50,7 @@ export const action = async ({ request, params }) => {
   const closeDay = (deliveryDay - 1 + 7) % 7;
   const closeTime = formData.get("closeTime") || "12:00";
   const sendReminder = formData.get("sendReminder") === "true";
+  const sendCreationEmail = formData.get("sendCreationEmail") === "true";
   const status = formData.get("status");
   const itemsJson = formData.get("items");
 
@@ -68,7 +69,7 @@ export const action = async ({ request, params }) => {
       where: { id: Number(params.id) },
       data: {
         shopifyCustomerId, customerName, customerEmail, name,
-        startDate, endDate, deliveryDay, closeDay, closeTime, sendReminder,
+        startDate, endDate, deliveryDay, closeDay, closeTime, sendReminder, sendCreationEmail,
         status: status || "active",
         items: {
           create: items.map((item) => ({
@@ -117,6 +118,7 @@ export default function EditStandingOrder() {
   );
   const [deliveryDay, setDeliveryDay] = useState(String(order.deliveryDay));
   const [sendReminder, setSendReminder] = useState(order.sendReminder ?? true);
+  const [sendCreationEmail, setSendCreationEmail] = useState(order.sendCreationEmail ?? true);
 
   const closeDay = (parseInt(deliveryDay, 10) - 1 + 7) % 7;
   const closeDayLabel = DAY_OPTIONS.find((o) => o.value === String(closeDay))?.label;
@@ -172,6 +174,7 @@ export default function EditStandingOrder() {
 
       <Form method="POST">
         <input type="hidden" name="sendReminder" value={String(sendReminder)} />
+        <input type="hidden" name="sendCreationEmail" value={String(sendCreationEmail)} />
         <input type="hidden" name="shopifyCustomerId" value={customer?.id || ""} />
         <input type="hidden" name="customerName" value={customer?.displayName || ""} />
         <input type="hidden" name="customerEmail" value={customer?.email || ""} />
@@ -262,6 +265,22 @@ export default function EditStandingOrder() {
               </label>
               <p style={{ fontSize: "0.8125rem", color: "#6d7175", marginTop: "0.25rem", marginLeft: "1.5rem" }}>
                 Sends a Shopify draft order email the day before cutoff prompting the customer to review and add items.
+              </p>
+            </div>
+          </div>
+          <div style={formRowStyle}>
+            <div style={fieldColStyle}>
+              <label style={{ ...labelStyle, display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={sendCreationEmail}
+                  onChange={(e) => setSendCreationEmail(e.target.checked)}
+                  style={{ width: 16, height: 16, cursor: "pointer" }}
+                />
+                Send email when draft order is created
+              </label>
+              <p style={{ fontSize: "0.8125rem", color: "#6d7175", marginTop: "0.25rem", marginLeft: "1.5rem" }}>
+                Notifies the customer when their weekly draft order is ready to review and add items.
               </p>
             </div>
           </div>

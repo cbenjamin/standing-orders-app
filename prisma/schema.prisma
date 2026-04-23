@@ -45,6 +45,7 @@ model StandingOrder {
   closeDay          Int                  // day draft locks + converts
   closeTime         String               @default("12:00") // HH:MM in America/New_York
   sendReminder      Boolean              @default(true)
+  sendCreationEmail Boolean              @default(true)
   status            String               @default("active")
   createdAt         DateTime             @default(now())
   updatedAt         DateTime             @updatedAt

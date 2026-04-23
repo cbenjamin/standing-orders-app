@@ -3,6 +3,7 @@ import {
   createDraftOrder,
   updateDraftOrder,
   createOrderFromDraft,
+  sendDraftOrderCreationEmail,
 } from "./shopify-graphql.server.js";
 
 /** Returns ISO date string (YYYY-MM-DD) for the next occurrence of targetDay (0=Sun…6=Sat), in EST */
@@ -53,6 +54,18 @@ export async function createDraftOrderForStandingOrder(admin, standingOrder) {
       },
     },
   });
+
+  if (standingOrder.sendCreationEmail) {
+    try {
+      await sendDraftOrderCreationEmail(admin, shopifyDraftOrder.id, {
+        closeTime: standingOrder.closeTime || "12:00",
+        closeDay: standingOrder.closeDay,
+        deliveryDate,
+      });
+    } catch (err) {
+      console.error(`[draft-orders] Creation email failed for "${standingOrder.name}": ${err.message}`);
+    }
+  }
 
   return shopifyDraftOrder;
 }
