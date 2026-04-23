@@ -161,6 +161,10 @@ export default function EditStandingOrder() {
     setItems((prev) => prev.map((item, i) => i === idx ? { ...item, quantity: Math.max(1, parseInt(qty) || 1) } : item));
   }, []);
 
+  const updatePrice = useCallback((idx, price) => {
+    setItems((prev) => prev.map((item, i) => i === idx ? { ...item, price } : item));
+  }, []);
+
   const removeItem = useCallback((idx) => { setItems((prev) => prev.filter((_, i) => i !== idx)); }, []);
 
   const customerResults = customerFetcher.data?.customers || [];
@@ -313,7 +317,19 @@ export default function EditStandingOrder() {
                       <div style={{ fontWeight: 500 }}>{item.productTitle}</div>
                       {item.variantTitle && <div style={{ color: "#6d7175", fontSize: "0.8125rem" }}>{item.variantTitle}</div>}
                     </td>
-                    <td style={{ padding: "0.5rem 0.6rem" }}>${item.price}</td>
+                    <td style={{ padding: "0.5rem 0.6rem" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "2px" }}>
+                        <span style={{ color: "#6d7175" }}>$</span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={item.price}
+                          onChange={(e) => updatePrice(idx, e.target.value)}
+                          style={{ width: 72, padding: "0.25rem 0.4rem", border: "1px solid #8c9196", borderRadius: 4, textAlign: "right" }}
+                        />
+                      </div>
+                    </td>
                     <td style={{ padding: "0.5rem 0.6rem" }}>
                       <input type="number" min="1" value={item.quantity} onChange={(e) => updateQty(idx, e.target.value)} style={{ width: 68, padding: "0.25rem 0.4rem", border: "1px solid #8c9196", borderRadius: 4, textAlign: "center" }} />
                     </td>

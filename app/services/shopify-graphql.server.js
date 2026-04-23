@@ -60,6 +60,7 @@ export async function createDraftOrder(admin, { customerId, lineItems, note, tag
           lineItems: lineItems.map((li) => ({
             variantId: li.variantId,
             quantity: li.quantity,
+            ...(li.price ? { originalUnitPrice: String(li.price) } : {}),
           })),
           note,
           tags,
@@ -102,6 +103,7 @@ export async function updateDraftOrder(admin, { draftOrderId, lineItems }) {
           lineItems: lineItems.map((li) => ({
             variantId: li.variantId,
             quantity: li.quantity,
+            ...(li.originalUnitPrice ? { originalUnitPrice: String(li.originalUnitPrice) } : {}),
           })),
         },
       },

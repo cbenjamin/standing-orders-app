@@ -4,6 +4,7 @@ import {
   updateDraftOrder,
   createOrderFromDraft,
   sendDraftOrderCreationEmail,
+  getDraftOrderDetails,
 } from "./shopify-graphql.server.js";
 
 /** Returns ISO date string (YYYY-MM-DD) for the next occurrence of targetDay (0=Sun…6=Sat), in EST */
@@ -33,6 +34,7 @@ export async function createDraftOrderForStandingOrder(admin, standingOrder) {
     lineItems: standingOrder.items.map((item) => ({
       variantId: item.shopifyVariantId,
       quantity: item.quantity,
+      price: item.price,
     })),
     note: `Standing Order: ${standingOrder.name} | Delivery: ${deliveryDate}`,
     tags: ["standing-order", `standing-order-id:${standingOrder.id}`],
@@ -93,9 +95,22 @@ export async function applyCustomerDraftOrderUpdate(admin, draftOrderRecordId, l
     }
   }
 
+  // Fetch current draft to preserve custom prices set at creation
+  const draft = await getDraftOrderDetails(admin, record.shopifyDraftOrderId);
+  const priceMap = {};
+  for (const { node } of draft.lineItems.edges) {
+    if (node.variant?.id) priceMap[node.variant.id] = node.originalUnitPrice;
+  }
+
+  const lineItemsWithPrices = lineItems.map((li) => ({
+    variantId: li.variantId,
+    quantity: li.quantity,
+    ...(priceMap[li.variantId] ? { originalUnitPrice: priceMap[li.variantId] } : {}),
+  }));
+
   return updateDraftOrder(admin, {
     draftOrderId: record.shopifyDraftOrderId,
-    lineItems,
+    lineItems: lineItemsWithPrices,
   });
 }
 
