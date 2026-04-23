@@ -48,7 +48,7 @@ export const loader = async ({ request }) => {
         title: node.title,
         variantTitle: node.variant?.title !== "Default Title" ? node.variant?.title ?? "" : "",
         variantId: node.variant?.id ?? null,
-        price: parseFloat(node.originalUnitPrice || 0),
+        price: parseFloat(node.discountedUnitPrice || node.originalUnitPrice || 0),
         quantity: node.quantity,
         min: node.variant?.id ? (minimums[node.variant.id]?.min ?? 0) : 0,
         isStanding: node.variant?.id ? (minimums[node.variant.id]?.isStanding ?? false) : false,
