@@ -165,7 +165,7 @@ export async function createOrderFromDraft(admin, draftOrderId, { tags = [], not
             priceSet: { shopMoney: { amount: "5.00", currencyCode: "USD" } },
           }],
         },
-        options: { sendReceipt: false },
+        options: { sendReceipt: true },
       },
     },
   );
