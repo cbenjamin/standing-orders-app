@@ -83,6 +83,7 @@ export default function StandingOrderDetail() {
             <InfoRow label="Deadline day" value={DAY_NAMES[order.closeDay]} />
             <InfoRow label="Cutoff time (EST)" value={order.closeTime || "12:00"} />
             <InfoRow label="Date range" value={`${order.startDate} → ${order.endDate}`} />
+            <InfoRow label="Reminder email" value={order.sendReminder ? "Enabled" : "Disabled"} />
           </div>
         </div>
 

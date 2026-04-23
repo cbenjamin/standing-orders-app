@@ -5,6 +5,7 @@ import {
   createDraftOrderForStandingOrder,
   completeDraftOrderRecord,
 } from "./services/draft-orders.server.js";
+import { sendDraftOrderReminderEmail } from "./services/shopify-graphql.server.js";
 
 let started = false;
 
@@ -105,6 +106,45 @@ export async function runDraftOrderCompleter() {
   }
 }
 
+export async function runDraftOrderReminder() {
+  const nowEST = getNowEST();
+  const tomorrowDay = (nowEST.getDay() + 1) % 7;
+
+  const records = await prisma.draftOrderRecord.findMany({
+    where: {
+      status: "open",
+      reminderSentAt: null,
+      standingOrder: {
+        closeDay: tomorrowDay,
+        sendReminder: true,
+        status: "active",
+      },
+    },
+    include: { standingOrder: true },
+  });
+
+  console.log(`[cron] Reminder: ${records.length} open draft orders to remind for tomorrow's cutoff (day ${tomorrowDay})`);
+  if (!records.length) return;
+
+  const admin = await getAdminClient();
+
+  for (const record of records) {
+    try {
+      await sendDraftOrderReminderEmail(admin, record.shopifyDraftOrderId, {
+        closeTime: record.standingOrder.closeTime || "12:00",
+        deliveryDate: record.deliveryDate,
+      });
+      await prisma.draftOrderRecord.update({
+        where: { id: record.id },
+        data: { reminderSentAt: new Date() },
+      });
+      console.log(`[cron] Reminder sent for ${record.shopifyDraftOrderName} (delivery: ${record.deliveryDate})`);
+    } catch (err) {
+      console.error(`[cron] Reminder failed for record ${record.id}: ${err.message}`);
+    }
+  }
+}
+
 export function initCron() {
   if (started) return;
   started = true;
@@ -112,6 +152,7 @@ export function initCron() {
   const createSchedule = process.env.CRON_DRAFT_CREATE || "0 6 * * *";
   const lockSchedule = process.env.CRON_DRAFT_LOCK || "*/15 * * * *";
   const completeSchedule = process.env.CRON_DRAFT_COMPLETE || "*/15 * * * *";
+  const reminderSchedule = process.env.CRON_DRAFT_REMINDER || "0 8 * * *";
 
   cron.schedule(createSchedule, () => {
     console.log("[cron] Running draft order creation job");
@@ -134,5 +175,12 @@ export function initCron() {
     );
   });
 
-  console.log(`[cron] Scheduler started — create: ${createSchedule} | lock: ${lockSchedule} | complete: ${completeSchedule}`);
+  cron.schedule(reminderSchedule, () => {
+    console.log("[cron] Running draft order reminder job");
+    runDraftOrderReminder().catch((err) =>
+      console.error("[cron] Reminder job failed:", err.message),
+    );
+  });
+
+  console.log(`[cron] Scheduler started — create: ${createSchedule} | lock: ${lockSchedule} | complete: ${completeSchedule} | reminder: ${reminderSchedule}`);
 }

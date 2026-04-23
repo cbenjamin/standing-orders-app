@@ -205,6 +205,25 @@ export async function completeDraftOrder(admin, draftOrderId) {
   return draftOrder;
 }
 
+export async function sendDraftOrderReminderEmail(admin, draftOrderId, { closeTime, deliveryDate }) {
+  const subject = `Your standing order for ${deliveryDate} — add items before ${closeTime} EST tomorrow`;
+  const customMessage = `It's not too late to add to your upcoming standing order! You have until ${closeTime} EST tomorrow to review and add items to this week's delivery.`;
+
+  const response = await admin.graphql(
+    `#graphql
+    mutation DraftOrderInvoiceSend($id: ID!, $email: EmailInput) {
+      draftOrderInvoiceSend(id: $id, email: $email) {
+        draftOrder { id }
+        userErrors { field message }
+      }
+    }`,
+    { variables: { id: draftOrderId, email: { subject, customMessage } } },
+  );
+  const json = await response.json();
+  const { userErrors } = json.data.draftOrderInvoiceSend;
+  if (userErrors?.length) throw new Error(userErrors.map((e) => e.message).join(", "));
+}
+
 export async function getDraftOrderDetails(admin, draftOrderId) {
   const response = await admin.graphql(
     `#graphql

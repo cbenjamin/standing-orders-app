@@ -1,4 +1,4 @@
-import { runDraftOrderCreator, runDraftOrderLocker, runDraftOrderCompleter } from "../cron.server";
+import { runDraftOrderCreator, runDraftOrderLocker, runDraftOrderCompleter, runDraftOrderReminder } from "../cron.server";
 import prisma from "../db.server";
 
 export const loader = async ({ request }) => {
@@ -36,6 +36,10 @@ export const loader = async ({ request }) => {
   if (job === "locker") {
     await runDraftOrderLocker();
     return new Response("Locker job ran — check PM2 logs", { headers: { "Content-Type": "text/plain" } });
+  }
+  if (job === "reminder") {
+    await runDraftOrderReminder();
+    return new Response("Reminder job ran — check PM2 logs", { headers: { "Content-Type": "text/plain" } });
   }
 
   await runDraftOrderCreator();
