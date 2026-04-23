@@ -5,6 +5,7 @@ import {
   createOrderFromDraft,
   sendDraftOrderCreationEmail,
   getDraftOrderDetails,
+  getVariantPrices,
 } from "./shopify-graphql.server.js";
 
 /** Returns ISO date string (YYYY-MM-DD) for the next occurrence of targetDay (0=Sun…6=Sat), in EST */
@@ -29,13 +30,32 @@ export async function createDraftOrderForStandingOrder(admin, standingOrder) {
   });
   if (existing) return null;
 
+  // Fetch current variant prices so we can apply a line-item discount
+  // to reach the custom standing order price (Shopify ignores originalUnitPrice
+  // when variantId is provided, so appliedDiscount is the reliable override)
+  const variantIds = standingOrder.items.map((i) => i.shopifyVariantId);
+  const variantPrices = await getVariantPrices(admin, variantIds);
+
+  const lineItems = standingOrder.items.map((item) => {
+    const customPrice = parseFloat(item.price);
+    const variantPrice = parseFloat(variantPrices[item.shopifyVariantId] ?? item.price);
+    const li = { variantId: item.shopifyVariantId, quantity: item.quantity };
+
+    if (!isNaN(customPrice) && !isNaN(variantPrice) && customPrice < variantPrice) {
+      const discountAmount = parseFloat((variantPrice - customPrice).toFixed(2));
+      li.appliedDiscount = {
+        valueType: "FIXED_AMOUNT",
+        value: discountAmount,
+        title: "Standing order price",
+      };
+      console.log(`[draft-orders] Custom price $${customPrice} for variant ${item.shopifyVariantId} (listed $${variantPrice}) — discount $${discountAmount}`);
+    }
+    return li;
+  });
+
   const shopifyDraftOrder = await createDraftOrder(admin, {
     customerId: standingOrder.shopifyCustomerId,
-    lineItems: standingOrder.items.map((item) => ({
-      variantId: item.shopifyVariantId,
-      quantity: item.quantity,
-      price: item.price,
-    })),
+    lineItems,
     note: `Standing Order: ${standingOrder.name} | Delivery: ${deliveryDate}`,
     tags: ["standing-order", `standing-order-id:${standingOrder.id}`],
   });

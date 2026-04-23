@@ -44,6 +44,27 @@ export async function searchProducts(admin, query) {
   }));
 }
 
+export async function getVariantPrices(admin, variantIds) {
+  const response = await admin.graphql(
+    `#graphql
+    query GetVariantPrices($ids: [ID!]!) {
+      nodes(ids: $ids) {
+        ... on ProductVariant {
+          id
+          price
+        }
+      }
+    }`,
+    { variables: { ids: variantIds } },
+  );
+  const json = await response.json();
+  const priceMap = {};
+  for (const node of json.data.nodes) {
+    if (node?.id) priceMap[node.id] = node.price;
+  }
+  return priceMap;
+}
+
 export async function createDraftOrder(admin, { customerId, lineItems, note, tags }) {
   const response = await admin.graphql(
     `#graphql
@@ -57,14 +78,11 @@ export async function createDraftOrder(admin, { customerId, lineItems, note, tag
       variables: {
         input: {
           customerId,
-          lineItems: lineItems.map((li) => {
-            const item = { variantId: li.variantId, quantity: li.quantity };
-            if (li.price != null) {
-              item.originalUnitPrice = parseFloat(li.price).toFixed(2);
-              console.log(`[shopify] draftOrderCreate line item variantId=${li.variantId} originalUnitPrice=${item.originalUnitPrice}`);
-            }
-            return item;
-          }),
+          lineItems: lineItems.map((li) => ({
+            variantId: li.variantId,
+            quantity: li.quantity,
+            ...(li.appliedDiscount ? { appliedDiscount: li.appliedDiscount } : {}),
+          })),
           note,
           tags,
           shippingLine: { title: "Delivery", price: "5.00" },
@@ -142,8 +160,8 @@ export async function createOrderFromDraft(admin, draftOrderId, { tags = [], not
   const lineItems = draft.lineItems.edges.map(({ node }) => ({
     variantId: node.variant?.id,
     quantity: node.quantity,
-    title: node.title,
-    originalUnitPrice: node.originalUnitPrice,
+    // discountedUnitPrice is the actual price after any standing-order discount applied
+    effectivePrice: node.discountedUnitPrice || node.originalUnitPrice,
   })).filter((li) => li.variantId); // skip custom lines without a variant
 
   const response = await admin.graphql(
@@ -163,7 +181,7 @@ export async function createOrderFromDraft(admin, draftOrderId, { tags = [], not
             quantity: li.quantity,
             priceSet: {
               shopMoney: {
-                amount: parseFloat(li.originalUnitPrice).toFixed(2),
+                amount: parseFloat(li.effectivePrice).toFixed(2),
                 currencyCode: "USD",
               },
             },
@@ -259,7 +277,7 @@ export async function getDraftOrderDetails(admin, draftOrderId) {
         lineItems(first: 50) {
           edges {
             node {
-              id title quantity originalUnitPrice
+              id title quantity originalUnitPrice discountedUnitPrice
               variant { id title image { url } }
               product { id title }
             }
