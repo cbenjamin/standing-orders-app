@@ -20,6 +20,22 @@ export const loader = async ({ request }) => {
   const url = new URL(request.url);
   const customerId = url.searchParams.get("logged_in_customer_id");
 
+  // Lightweight banner check — returns JSON for the storefront snippet
+  if (url.searchParams.get("intent") === "check") {
+    if (!customerId || customerId === "0") {
+      return new Response(JSON.stringify({ hasPendingOrder: false }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    const shopifyCustomerId = toGid(customerId);
+    const count = await prisma.draftOrderRecord.count({
+      where: { status: "open", standingOrder: { shopifyCustomerId } },
+    });
+    return new Response(JSON.stringify({ hasPendingOrder: count > 0 }), {
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
   if (!customerId || customerId === "0") {
     return htmlResponse(page("Your upcoming orders", `
       <div class="card" style="text-align:center;padding:3rem">
