@@ -6,6 +6,12 @@ import { searchStorefrontProducts } from "../services/shopify-storefront.server"
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
+function formatDate(dateStr) {
+  if (!dateStr) return "";
+  const [y, m, d] = dateStr.split("-");
+  return `${m}/${d}/${y}`;
+}
+
 function toGid(numericId) {
   return `gid://shopify/Customer/${numericId}`;
 }
@@ -227,7 +233,7 @@ function orderCard(order, successId, lockedId) {
     <div class="card" id="card-${order.id}">
       <div class="order-meta">
         <span>${escHtml(order.name)} ${lockedBadge}</span>
-        <span>Delivery: <strong>${order.deliveryDate}</strong></span>
+        <span>Delivery: <strong>${formatDate(order.deliveryDate)}</strong></span>
         <span>Deadline: <strong>${DAY_NAMES[order.closeDay]} by ${order.closeTime} EST</strong></span>
       </div>
       ${lockedBanner}${successBanner}

@@ -281,17 +281,23 @@ async function sendDraftOrderEmail(admin, draftOrderId, { subject, customMessage
   if (userErrors?.length) throw new Error(userErrors.map((e) => e.message).join(", "));
 }
 
+function fmtDate(dateStr) {
+  if (!dateStr) return dateStr;
+  const [y, m, d] = dateStr.split("-");
+  return `${m}/${d}/${y}`;
+}
+
 export async function sendDraftOrderCreationEmail(admin, draftOrderId, { closeTime, closeDay, deliveryDate }) {
   const dayName = DAY_NAMES[closeDay] || "the deadline day";
   await sendDraftOrderEmail(admin, draftOrderId, {
-    subject: `Your standing order for ${deliveryDate} is ready — add items before ${closeTime} EST on ${dayName}`,
+    subject: `Your standing order for ${fmtDate(deliveryDate)} is ready — add items before ${closeTime} EST on ${dayName}`,
     customMessage: `Your next standing order is now available. You can add items or update quantities until ${closeTime} EST on ${dayName}.`,
   });
 }
 
 export async function sendDraftOrderReminderEmail(admin, draftOrderId, { closeTime, deliveryDate }) {
   await sendDraftOrderEmail(admin, draftOrderId, {
-    subject: `Your standing order for ${deliveryDate} — add items before ${closeTime} EST tomorrow`,
+    subject: `Your standing order for ${fmtDate(deliveryDate)} — add items before ${closeTime} EST tomorrow`,
     customMessage: `It's not too late to add to your upcoming standing order! You have until ${closeTime} EST tomorrow to review and add items to this week's delivery.`,
   });
 }

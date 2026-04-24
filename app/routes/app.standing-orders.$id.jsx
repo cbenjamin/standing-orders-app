@@ -5,6 +5,12 @@ import prisma from "../db.server";
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
+function formatDate(dateStr) {
+  if (!dateStr) return "";
+  const [y, m, d] = dateStr.split("-");
+  return `${m}/${d}/${y}`;
+}
+
 export const loader = async ({ request, params }) => {
   const { session } = await authenticate.admin(request);
   const order = await prisma.standingOrder.findUnique({
@@ -82,7 +88,7 @@ export default function StandingOrderDetail() {
             <InfoRow label="Delivery day" value={DAY_NAMES[order.deliveryDay]} />
             <InfoRow label="Deadline day" value={DAY_NAMES[order.closeDay]} />
             <InfoRow label="Cutoff time (EST)" value={order.closeTime || "12:00"} />
-            <InfoRow label="Date range" value={`${order.startDate} → ${order.endDate}`} />
+            <InfoRow label="Date range" value={`${formatDate(order.startDate)} → ${formatDate(order.endDate)}`} />
             <InfoRow label="Creation email" value={order.sendCreationEmail ? "Enabled" : "Disabled"} />
             <InfoRow label="Reminder email" value={order.sendReminder ? "Enabled" : "Disabled"} />
           </div>
@@ -172,7 +178,7 @@ export default function StandingOrderDetail() {
                       </a>
                     )}
                   </td>
-                  <td style={tdStyle}>{d.deliveryDate}</td>
+                  <td style={tdStyle}>{formatDate(d.deliveryDate)}</td>
                   <td style={tdStyle}>
                     <span style={{
                       ...(draftStatusColor[d.status] || { background: "#e1e3e5", color: "#3d3d3d" }),

@@ -5,6 +5,12 @@ import prisma from "../db.server";
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+function formatDate(dateStr) {
+  if (!dateStr) return "";
+  const [y, m, d] = dateStr.split("-");
+  return `${m}/${d}/${y}`;
+}
+
 export const loader = async ({ request }) => {
   await authenticate.admin(request);
   const url = new URL(request.url);
@@ -93,7 +99,7 @@ export default function StandingOrderList() {
                   <td style={{ padding: "0.75rem" }}>{order._count.items}</td>
                   <td style={{ padding: "0.75rem" }}>{DAY_NAMES[order.deliveryDay]}</td>
                   <td style={{ padding: "0.75rem", fontSize: "0.8125rem", color: "#6d7175" }}>
-                    {order.startDate} → {order.endDate}
+                    {formatDate(order.startDate)} → {formatDate(order.endDate)}
                   </td>
                   <td style={{ padding: "0.75rem" }}>
                     <StatusBadge status={order.status} />
