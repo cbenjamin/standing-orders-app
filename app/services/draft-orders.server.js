@@ -195,10 +195,9 @@ export async function completeDraftOrderRecord(admin, recordId) {
       include: { standingOrder: true },
     });
 
-    const tags = ["standing-order", `standing-order-id:${record.standingOrderId}`];
-    const note = `Standing Order: ${record.standingOrder.name} | Delivery: ${record.deliveryDate}`;
-
-    const order = await createOrderFromDraft(admin, record.shopifyDraftOrderId, { tags, note });
+    // Tags and note are already set on the draft when it was created,
+    // so draftOrderComplete inherits them automatically.
+    const order = await createOrderFromDraft(admin, record.shopifyDraftOrderId);
     const orderId = order?.id || null;
     const orderName = order?.name || null;
 

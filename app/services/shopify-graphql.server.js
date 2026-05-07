@@ -65,7 +65,46 @@ export async function getVariantPrices(admin, variantIds) {
   return priceMap;
 }
 
+async function getCustomerDefaultAddress(admin, customerId) {
+  const response = await admin.graphql(
+    `#graphql
+    query GetCustomerAddress($id: ID!) {
+      customer(id: $id) {
+        defaultAddress {
+          firstName lastName company
+          address1 address2
+          city province zip
+          countryCodeV2
+          phone
+        }
+      }
+    }`,
+    { variables: { id: customerId } },
+  );
+  const json = await response.json();
+  return json.data?.customer?.defaultAddress ?? null;
+}
+
 export async function createDraftOrder(admin, { customerId, lineItems, note, tags }) {
+  // Fetch customer's default address so draftOrderComplete can succeed
+  // (Shopify requires a shipping address when a shippingLine is present)
+  const defaultAddress = await getCustomerDefaultAddress(admin, customerId);
+
+  const shippingAddress = defaultAddress
+    ? {
+        firstName: defaultAddress.firstName,
+        lastName: defaultAddress.lastName,
+        company: defaultAddress.company,
+        address1: defaultAddress.address1,
+        address2: defaultAddress.address2,
+        city: defaultAddress.city,
+        province: defaultAddress.province,
+        zip: defaultAddress.zip,
+        countryCode: defaultAddress.countryCodeV2,
+        phone: defaultAddress.phone,
+      }
+    : undefined;
+
   const response = await admin.graphql(
     `#graphql
     mutation DraftOrderCreate($input: DraftOrderInput!) {
@@ -86,6 +125,7 @@ export async function createDraftOrder(admin, { customerId, lineItems, note, tag
           note,
           tags,
           shippingLine: { title: "Delivery", price: "5.00" },
+          ...(shippingAddress ? { shippingAddress } : {}),
         },
       },
     },
@@ -136,114 +176,30 @@ export async function updateDraftOrder(admin, { draftOrderId, lineItems }) {
   return draftOrder;
 }
 
-async function getFulfillmentPaymentTermsTemplateId(admin) {
+export async function createOrderFromDraft(admin, draftOrderId) {
+  // draftOrderComplete(paymentPending: true) creates the order in a payment-pending
+  // state (equivalent to "pay on fulfillment / net terms") while preserving all
+  // draft data: line items, discounts, tags, note, and shipping address.
+  // Crucially, orders created this way remain editable in the Shopify admin —
+  // unlike orders created via the orderCreate mutation with paymentTermsCreate,
+  // which Shopify locks from editing.
   const response = await admin.graphql(
     `#graphql
-    query {
-      paymentTermsTemplates {
-        id
-        paymentTermsType
-      }
-    }`,
-  );
-  const json = await response.json();
-  const template = json.data.paymentTermsTemplates.find(
-    (t) => t.paymentTermsType === "FULFILLMENT",
-  );
-  return template?.id || null;
-}
-
-export async function createOrderFromDraft(admin, draftOrderId, { tags = [], note = "" } = {}) {
-  const [draft, paymentTermsTemplateId] = await Promise.all([
-    getDraftOrderDetails(admin, draftOrderId),
-    getFulfillmentPaymentTermsTemplateId(admin),
-  ]);
-  if (!draft) throw new Error(`Draft order ${draftOrderId} not found`);
-
-  const lineItems = draft.lineItems.edges.map(({ node }) => ({
-    variantId: node.variant?.id,
-    quantity: node.quantity,
-    // discountedUnitPrice is the actual price after any standing-order discount applied
-    effectivePrice: node.discountedUnitPrice || node.originalUnitPrice,
-  })).filter((li) => li.variantId); // skip custom lines without a variant
-
-  const response = await admin.graphql(
-    `#graphql
-    mutation OrderCreate($order: OrderCreateOrderInput!, $options: OrderCreateOptionsInput) {
-      orderCreate(order: $order, options: $options) {
-        order { id name }
-        userErrors { field message }
-      }
-    }`,
-    {
-      variables: {
-        order: {
-          customerId: draft.customer?.id,
-          lineItems: lineItems.map((li) => ({
-            variantId: li.variantId,
-            quantity: li.quantity,
-            priceSet: {
-              shopMoney: {
-                amount: parseFloat(li.effectivePrice).toFixed(2),
-                currencyCode: "USD",
-              },
-            },
-          })),
-          financialStatus: "PENDING",
-          note,
-          tags,
-          shippingLines: [{
-            title: "Delivery",
-            priceSet: { shopMoney: { amount: "5.00", currencyCode: "USD" } },
-          }],
-        },
-        options: { sendReceipt: true },
-      },
-    },
-  );
-  const json = await response.json();
-  const { order, userErrors } = json.data.orderCreate;
-  if (userErrors?.length) throw new Error(userErrors.map((e) => e.message).join(", "));
-
-  // Set payment terms to "due on fulfillment"
-  if (order?.id && paymentTermsTemplateId) {
-    try {
-      const ptResponse = await admin.graphql(
-        `#graphql
-        mutation PaymentTermsCreate($referenceId: ID!, $paymentTermsAttributes: PaymentTermsCreateInput!) {
-          paymentTermsCreate(referenceId: $referenceId, paymentTermsAttributes: $paymentTermsAttributes) {
-            paymentTerms { id paymentTermsType }
-            userErrors { field message }
-          }
-        }`,
-        {
-          variables: {
-            referenceId: order.id,
-            paymentTermsAttributes: { paymentTermsTemplateId },
-          },
-        },
-      );
-      const ptJson = await ptResponse.json();
-      const ptErrors = ptJson.data?.paymentTermsCreate?.userErrors;
-      if (ptErrors?.length) console.error("[shopify] paymentTermsCreate errors:", ptErrors);
-    } catch (err) {
-      console.error("[shopify] paymentTermsCreate failed:", err.message);
-    }
-  }
-
-  // Delete the draft order now that we've created the real order
-  await admin.graphql(
-    `#graphql
-    mutation DraftOrderDelete($id: ID!) {
-      draftOrderDelete(input: { id: $id }) {
-        deletedId
+    mutation DraftOrderComplete($id: ID!) {
+      draftOrderComplete(id: $id, paymentPending: true) {
+        draftOrder {
+          id
+          order { id name }
+        }
         userErrors { field message }
       }
     }`,
     { variables: { id: draftOrderId } },
   );
-
-  return order;
+  const json = await response.json();
+  const { draftOrder, userErrors } = json.data.draftOrderComplete;
+  if (userErrors?.length) throw new Error(userErrors.map((e) => e.message).join(", "));
+  return draftOrder?.order ?? null;
 }
 
 export async function completeDraftOrder(admin, draftOrderId) {

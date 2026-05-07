@@ -1,0 +1,128 @@
+{% comment %}
+  Standing Order Banner Snippet
+  ─────────────────────────────
+  Shows a banner when a logged-in customer has an open standing order
+  awaiting their review this week.
+
+  INSTALLATION
+  ────────────
+  1. Copy this file into your theme's snippets/ folder
+     (Online Store → Themes → Edit code → snippets/)
+
+  2. Render it once in your theme layout, typically in
+     theme.liquid just before the closing </body> tag:
+
+       {% render 'standing-order-banner' %}
+
+  3. (Optional) Customise the colours in the <style> block below.
+
+  HOW IT WORKS
+  ────────────
+  The snippet renders a hidden banner, then (for logged-in customers only)
+  fires a lightweight fetch to the app proxy.  Shopify automatically appends
+  logged_in_customer_id so the app knows who is asking.
+  If the customer has an open draft order the banner becomes visible.
+  The call is fire-and-forget; if it fails the banner simply stays hidden.
+{% endcomment %}
+
+{% if customer %}
+
+<div id="so-banner" style="display:none" aria-live="polite">
+  <div class="so-banner__inner">
+    <span class="so-banner__icon" aria-hidden="true">
+      {%- comment -%}Repeat icon SVG inline so it works without asset pipeline{%- endcomment -%}
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M9 1.5A7.5 7.5 0 1 0 16.5 9" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+        <path d="M13.5 1.5v4h-4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </span>
+    <span class="so-banner__message">
+      Your standing order for this week is ready.
+      <a class="so-banner__link" href="/apps/standing-orders">Review &amp; add items →</a>
+    </span>
+    <button
+      class="so-banner__close"
+      aria-label="Dismiss banner"
+      onclick="document.getElementById('so-banner').style.display='none';sessionStorage.setItem('so-banner-dismissed','1')"
+    >
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+      </svg>
+    </button>
+  </div>
+</div>
+
+<style>
+  #so-banner {
+    background: #e8f5ee;
+    border-bottom: 2px solid #3db870;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.4;
+    width: 100%;
+  }
+  .so-banner__inner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 10px 20px;
+  }
+  .so-banner__icon {
+    flex-shrink: 0;
+    color: #1a5c38;
+    display: flex;
+    align-items: center;
+  }
+  .so-banner__message {
+    flex: 1;
+    color: #0d3b20;
+    font-weight: 500;
+  }
+  .so-banner__link {
+    color: #1a5c38;
+    font-weight: 700;
+    text-decoration: underline;
+    margin-left: 6px;
+  }
+  .so-banner__link:hover {
+    color: #0d3b20;
+  }
+  .so-banner__close {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #1a5c38;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    opacity: 0.7;
+  }
+  .so-banner__close:hover {
+    opacity: 1;
+  }
+</style>
+
+<script>
+(function () {
+  // Don't re-show if the customer dismissed it this session
+  if (sessionStorage.getItem('so-banner-dismissed') === '1') return;
+
+  fetch('/apps/standing-orders?intent=check', {
+    method: 'GET',
+    credentials: 'same-origin',
+    headers: { 'Accept': 'application/json' }
+  })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (data) {
+      if (data && data.hasPendingOrder) {
+        document.getElementById('so-banner').style.display = 'block';
+      }
+    })
+    .catch(function () { /* silently ignore network errors */ });
+})();
+</script>
+
+{% endif %}
