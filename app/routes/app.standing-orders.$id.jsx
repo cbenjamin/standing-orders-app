@@ -18,6 +18,7 @@ export const loader = async ({ request, params }) => {
     include: {
       items: true,
       draftOrders: { orderBy: { deliveryDate: "desc" } },
+      events: { orderBy: { createdAt: "desc" }, take: 50 },
     },
   });
   if (!order) throw new Response("Not Found", { status: 404 });
@@ -145,6 +146,81 @@ export default function StandingOrderDetail() {
             ))}
           </tbody>
         </table>
+      </s-section>
+
+      {/* Activity log */}
+      <s-section heading="Activity">
+        {order.events.length === 0 ? (
+          <p style={{ fontSize: "0.875rem", color: "#6d7175" }}>No activity yet.</p>
+        ) : (
+          <>
+            {/* Additional revenue summary */}
+            {(() => {
+              const totalAdditional = order.events
+                .filter((e) => e.eventType === "customer_updated")
+                .reduce((sum, e) => {
+                  try { return sum + (JSON.parse(e.metadata)?.additionalRevenue ?? 0); } catch { return sum; }
+                }, 0);
+              return totalAdditional > 0 ? (
+                <div style={{ background: "#f1f8f5", border: "1px solid #95c9b4", borderRadius: 6, padding: "0.75rem 1rem", marginBottom: "1rem", display: "flex", gap: "2rem" }}>
+                  <div>
+                    <div style={{ fontSize: "0.75rem", color: "#6d7175", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em" }}>Additional revenue from modifications</div>
+                    <div style={{ fontSize: "1.25rem", fontWeight: 700, color: "#0d3b2e" }}>${totalAdditional.toFixed(2)}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: "0.75rem", color: "#6d7175", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em" }}>Customer modifications</div>
+                    <div style={{ fontSize: "1.25rem", fontWeight: 700, color: "#0d3b2e" }}>{order.events.filter((e) => e.eventType === "customer_updated").length}</div>
+                  </div>
+                </div>
+              ) : null;
+            })()}
+            <table style={tableStyle}>
+              <thead>
+                <tr style={{ borderBottom: "1px solid #e1e3e5" }}>
+                  {["Date", "Event", "Details"].map((h) => (
+                    <th key={h} style={thStyle}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {order.events.map((event) => {
+                  let meta = {};
+                  try { meta = JSON.parse(event.metadata) || {}; } catch {}
+                  const label = {
+                    creation_email_sent: "Creation email sent",
+                    reminder_email_sent: "Reminder email sent",
+                    customer_updated: "Customer updated order",
+                  }[event.eventType] ?? event.eventType;
+                  const detail = event.eventType === "customer_updated"
+                    ? meta.additionalRevenue > 0
+                      ? `+$${meta.additionalRevenue.toFixed(2)} above minimums`
+                      : "No additional items"
+                    : meta.draftOrderName ?? meta.deliveryDate ?? "—";
+                  return (
+                    <tr key={event.id} style={{ borderBottom: "1px solid #f6f6f7" }}>
+                      <td style={{ ...tdStyle, color: "#6d7175", whiteSpace: "nowrap" }}>
+                        {new Date(event.createdAt).toLocaleString("en-US", { timeZone: "America/New_York", month: "2-digit", day: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })} EST
+                      </td>
+                      <td style={tdStyle}>
+                        <span style={{
+                          ...({
+                            creation_email_sent: { background: "#e3f1df", color: "#0d3b2e" },
+                            reminder_email_sent: { background: "#e3f1df", color: "#0d3b2e" },
+                            customer_updated: { background: "#d1ecf1", color: "#0c5460" },
+                          }[event.eventType] ?? { background: "#e1e3e5", color: "#3d3d3d" }),
+                          padding: "2px 8px", borderRadius: 10, fontSize: "0.75rem", fontWeight: 500,
+                        }}>
+                          {label}
+                        </span>
+                      </td>
+                      <td style={{ ...tdStyle, fontSize: "0.8125rem", color: "#6d7175" }}>{detail}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </>
+        )}
       </s-section>
 
       {/* Draft orders */}

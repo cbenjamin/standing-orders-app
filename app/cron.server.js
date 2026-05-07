@@ -6,6 +6,7 @@ import {
   completeDraftOrderRecord,
 } from "./services/draft-orders.server.js";
 import { sendDraftOrderReminderEmail } from "./services/shopify-graphql.server.js";
+import { logEvent } from "./services/events.server.js";
 
 let started = false;
 
@@ -137,6 +138,10 @@ export async function runDraftOrderReminder() {
       await prisma.draftOrderRecord.update({
         where: { id: record.id },
         data: { reminderSentAt: new Date() },
+      });
+      await logEvent(record.standingOrderId, record.id, "reminder_email_sent", {
+        draftOrderName: record.shopifyDraftOrderName,
+        deliveryDate: record.deliveryDate,
       });
       console.log(`[cron] Reminder sent for ${record.shopifyDraftOrderName} (delivery: ${record.deliveryDate})`);
     } catch (err) {

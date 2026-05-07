@@ -51,6 +51,7 @@ model StandingOrder {
   updatedAt         DateTime             @updatedAt
   items             StandingOrderItem[]
   draftOrders       DraftOrderRecord[]
+  events            StandingOrderEvent[]
 }
 
 model StandingOrderItem {
@@ -77,6 +78,18 @@ model DraftOrderRecord {
   completedOrderName    String?
   reminderSentAt        DateTime?
   items                 DraftOrderItem[]
+  events                StandingOrderEvent[]
+}
+
+model StandingOrderEvent {
+  id                 Int               @id @default(autoincrement())
+  standingOrderId    Int
+  standingOrder      StandingOrder     @relation(fields: [standingOrderId], references: [id])
+  draftOrderRecordId Int?
+  draftOrderRecord   DraftOrderRecord? @relation(fields: [draftOrderRecordId], references: [id])
+  eventType          String            // creation_email_sent | reminder_email_sent | customer_updated
+  metadata           String?           // JSON
+  createdAt          DateTime          @default(now())
 }
 
 model DraftOrderItem {

@@ -7,6 +7,7 @@ import {
   getDraftOrderDetails,
   getVariantPrices,
 } from "./shopify-graphql.server.js";
+import { logEvent } from "./events.server.js";
 
 /** Returns ISO date string (YYYY-MM-DD) for the next occurrence of targetDay (0=Sun…6=Sat), in EST */
 export function nextWeekday(targetDay) {
@@ -77,11 +78,21 @@ export async function createDraftOrderForStandingOrder(admin, standingOrder) {
     },
   });
 
+  // Fetch the newly created record id for event logging
+  const newRecord = await prisma.draftOrderRecord.findFirst({
+    where: { standingOrderId: standingOrder.id, deliveryDate },
+    orderBy: { createdAt: "desc" },
+  });
+
   if (standingOrder.sendCreationEmail) {
     try {
       await sendDraftOrderCreationEmail(admin, shopifyDraftOrder.id, {
         closeTime: standingOrder.closeTime || "12:00",
         closeDay: standingOrder.closeDay,
+        deliveryDate,
+      });
+      await logEvent(standingOrder.id, newRecord?.id ?? null, "creation_email_sent", {
+        draftOrderName: shopifyDraftOrder.name,
         deliveryDate,
       });
     } catch (err) {
@@ -141,9 +152,28 @@ export async function applyCustomerDraftOrderUpdate(admin, draftOrderRecordId, l
     return item;
   });
 
-  return updateDraftOrder(admin, {
+  await updateDraftOrder(admin, {
     draftOrderId: record.shopifyDraftOrderId,
     lineItems: lineItemsWithPrices,
+  });
+
+  // Compute additional revenue above the standing minimums
+  let additionalRevenue = 0;
+  for (const li of lineItems) {
+    const prices = priceMap[li.variantId];
+    const effectivePrice = prices?.discountedPrice ?? prices?.regularPrice ?? 0;
+    const standingItem = record.items.find((i) => i.shopifyVariantId === li.variantId && i.isStandingItem);
+    const baseQty = standingItem ? standingItem.minimumQuantity : 0;
+    const extraQty = li.quantity - baseQty;
+    if (extraQty > 0) additionalRevenue += extraQty * effectivePrice;
+  }
+
+  await logEvent(record.standingOrderId, record.id, "customer_updated", {
+    additionalRevenue: parseFloat(additionalRevenue.toFixed(2)),
+    lineItems: lineItems.map((li) => ({
+      variantId: li.variantId,
+      quantity: li.quantity,
+    })),
   });
 }
 
