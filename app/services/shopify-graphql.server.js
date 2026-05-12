@@ -177,29 +177,78 @@ export async function updateDraftOrder(admin, { draftOrderId, lineItems }) {
 }
 
 export async function createOrderFromDraft(admin, draftOrderId) {
-  // draftOrderComplete(paymentPending: true) creates the order in a payment-pending
-  // state (equivalent to "pay on fulfillment / net terms") while preserving all
-  // draft data: line items, discounts, tags, note, and shipping address.
-  // Crucially, orders created this way remain editable in the Shopify admin —
-  // unlike orders created via the orderCreate mutation with paymentTermsCreate,
-  // which Shopify locks from editing.
+  // Uses orderCreate (not draftOrderComplete) so the order bypasses Shopify
+  // checkout validation functions — e.g. a third-party app enforcing a $100
+  // minimum would block draftOrderComplete but not orderCreate.
+  //
+  // We intentionally do NOT call paymentTermsCreate after order creation.
+  // Adding FULFILLMENT payment terms locks orders from editing in the Shopify
+  // admin UI. Leaving the order as financialStatus=PENDING (no formal payment
+  // schedule) keeps it fully editable while still showing as unpaid, which is
+  // correct for the farm's net-terms / invoice-on-fulfillment workflow.
+  const draft = await getDraftOrderDetails(admin, draftOrderId);
+  if (!draft) throw new Error(`Draft order ${draftOrderId} not found`);
+
+  const lineItems = draft.lineItems.edges
+    .map(({ node }) => ({
+      variantId: node.variant?.id,
+      quantity: node.quantity,
+      // Use discountedUnitPrice so standing-order custom prices carry through
+      effectivePrice: node.discountedUnitPrice || node.originalUnitPrice,
+    }))
+    .filter((li) => li.variantId);
+
   const response = await admin.graphql(
     `#graphql
-    mutation DraftOrderComplete($id: ID!) {
-      draftOrderComplete(id: $id, paymentPending: true) {
-        draftOrder {
-          id
-          order { id name }
-        }
+    mutation OrderCreate($order: OrderCreateOrderInput!, $options: OrderCreateOptionsInput) {
+      orderCreate(order: $order, options: $options) {
+        order { id name }
+        userErrors { field message }
+      }
+    }`,
+    {
+      variables: {
+        order: {
+          customerId: draft.customer?.id,
+          lineItems: lineItems.map((li) => ({
+            variantId: li.variantId,
+            quantity: li.quantity,
+            priceSet: {
+              shopMoney: {
+                amount: parseFloat(li.effectivePrice).toFixed(2),
+                currencyCode: "USD",
+              },
+            },
+          })),
+          financialStatus: "PENDING",
+          note: draft.note,
+          tags: draft.tags,
+          shippingLines: [{
+            title: "Delivery",
+            priceSet: { shopMoney: { amount: "5.00", currencyCode: "USD" } },
+          }],
+        },
+        options: { sendReceipt: true },
+      },
+    },
+  );
+  const json = await response.json();
+  const { order, userErrors } = json.data.orderCreate;
+  if (userErrors?.length) throw new Error(userErrors.map((e) => e.message).join(", "));
+
+  // Archive the draft now that the real order exists
+  await admin.graphql(
+    `#graphql
+    mutation DraftOrderDelete($id: ID!) {
+      draftOrderDelete(input: { id: $id }) {
+        deletedId
         userErrors { field message }
       }
     }`,
     { variables: { id: draftOrderId } },
   );
-  const json = await response.json();
-  const { draftOrder, userErrors } = json.data.draftOrderComplete;
-  if (userErrors?.length) throw new Error(userErrors.map((e) => e.message).join(", "));
-  return draftOrder?.order ?? null;
+
+  return order;
 }
 
 export async function completeDraftOrder(admin, draftOrderId) {
@@ -263,7 +312,7 @@ export async function getDraftOrderDetails(admin, draftOrderId) {
     `#graphql
     query GetDraftOrder($id: ID!) {
       draftOrder(id: $id) {
-        id name status invoiceUrl
+        id name status invoiceUrl note tags
         customer { id }
         lineItems(first: 50) {
           edges {
