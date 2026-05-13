@@ -1,4 +1,5 @@
 import { useLoaderData, useNavigate, useSearchParams, Link } from "react-router";
+import { useState, useEffect, useRef } from "react";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
@@ -15,29 +16,51 @@ export const loader = async ({ request }) => {
   await authenticate.admin(request);
   const url = new URL(request.url);
   const showArchived = url.searchParams.get("archived") === "1";
+  const q = url.searchParams.get("q")?.trim() || "";
+
+  const statusFilter = showArchived ? { status: "archived" } : { status: { not: "archived" } };
+  const searchFilter = q
+    ? {
+        OR: [
+          { name: { contains: q } },
+          { customerName: { contains: q } },
+          { customerEmail: { contains: q } },
+        ],
+      }
+    : {};
 
   const orders = await prisma.standingOrder.findMany({
-    where: showArchived ? { status: "archived" } : { status: { not: "archived" } },
+    where: { ...statusFilter, ...searchFilter },
     include: { _count: { select: { items: true } } },
     orderBy: { createdAt: "desc" },
   });
 
   const archivedCount = await prisma.standingOrder.count({ where: { status: "archived" } });
 
-  return { orders, showArchived, archivedCount };
+  return { orders, showArchived, archivedCount, q };
 };
 
 export default function StandingOrderList() {
-  const { orders, showArchived, archivedCount } = useLoaderData();
+  const { orders, showArchived, archivedCount, q } = useLoaderData();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const [searchValue, setSearchValue] = useState(q);
+  const debounceRef = useRef(null);
 
-  const toggleArchived = () => {
-    if (showArchived) {
-      setSearchParams({});
-    } else {
-      setSearchParams({ archived: "1" });
-    }
+  // Sync input when tab switches (q resets to "")
+  useEffect(() => {
+    setSearchValue(q);
+  }, [q]);
+
+  const handleSearch = (value) => {
+    setSearchValue(value);
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      const params = {};
+      if (showArchived) params.archived = "1";
+      if (value) params.q = value;
+      setSearchParams(params);
+    }, 400);
   };
 
   return (
@@ -54,6 +77,17 @@ export default function StandingOrderList() {
         <button onClick={() => setSearchParams({ archived: "1" })} style={tabStyle(showArchived)}>
           Archived {archivedCount > 0 && <span style={countBadgeStyle}>{archivedCount}</span>}
         </button>
+      </div>
+
+      {/* Search bar */}
+      <div style={{ marginBottom: "1rem" }}>
+        <input
+          type="search"
+          placeholder="Search by name, customer, or email…"
+          value={searchValue}
+          onChange={(e) => handleSearch(e.target.value)}
+          style={searchInputStyle}
+        />
       </div>
 
       {orders.length === 0 ? (
@@ -140,6 +174,17 @@ const tabStyle = (active) => ({
   color: active ? "#008060" : "#6d7175",
   marginBottom: "-1px",
 });
+
+const searchInputStyle = {
+  width: "100%",
+  maxWidth: 400,
+  padding: "0.5rem 0.75rem",
+  border: "1px solid #c9cccf",
+  borderRadius: 6,
+  fontSize: "0.875rem",
+  outline: "none",
+  boxSizing: "border-box",
+};
 
 const countBadgeStyle = {
   display: "inline-flex",
