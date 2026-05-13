@@ -176,7 +176,7 @@ export async function updateDraftOrder(admin, { draftOrderId, lineItems }) {
   return draftOrder;
 }
 
-export async function createOrderFromDraft(admin, draftOrderId) {
+export async function createOrderFromDraft(admin, draftOrderId, { tags = [], note = "" } = {}) {
   // Uses orderCreate (not draftOrderComplete) so the order bypasses Shopify
   // checkout validation functions — e.g. a third-party app enforcing a $100
   // minimum would block draftOrderComplete but not orderCreate.
@@ -221,8 +221,8 @@ export async function createOrderFromDraft(admin, draftOrderId) {
             },
           })),
           financialStatus: "PENDING",
-          note: draft.note,
-          tags: draft.tags,
+          note,
+          tags,
           shippingLines: [{
             title: "Delivery",
             priceSet: { shopMoney: { amount: "5.00", currencyCode: "USD" } },
@@ -312,7 +312,7 @@ export async function getDraftOrderDetails(admin, draftOrderId) {
     `#graphql
     query GetDraftOrder($id: ID!) {
       draftOrder(id: $id) {
-        id name status invoiceUrl note tags
+        id name status invoiceUrl
         customer { id }
         lineItems(first: 50) {
           edges {
