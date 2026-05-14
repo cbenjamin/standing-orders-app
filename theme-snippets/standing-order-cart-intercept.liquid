@@ -1,0 +1,263 @@
+{% comment %}
+  Standing Order Cart Intercept Snippet
+  ──────────────────────────────────────
+  When a logged-in customer has an open standing order and clicks
+  "Add to Cart", this snippet shows a dialog prompting them to add
+  items to their standing order instead of creating a new one.
+
+  INSTALLATION
+  ────────────
+  1. Copy this file into your theme's snippets/ folder
+     (Online Store → Themes → Edit code → snippets/)
+
+  2. In layout/theme.liquid add ONE line directly below the
+     standing-order-banner render tag:
+
+       {% render 'standing-order-cart-intercept' %}
+
+  HOW IT WORKS
+  ────────────
+  On page load the snippet pre-fetches /apps/standing-orders?intent=check
+  (same endpoint as the banner) and caches the result in sessionStorage
+  for 5 minutes so repeat page views add no extra network requests.
+
+  When the result is "pending order exists" and the customer clicks an
+  add-to-cart button, the click is intercepted (capture phase) and a
+  modal is shown with two choices:
+    • "Add to my standing order" → navigates to /apps/standing-orders
+    • "Add to cart instead"       → proceeds with the original click
+
+  If the status check hasn't resolved yet when the customer clicks,
+  the click passes through unchanged — no blocking behaviour.
+{% endcomment %}
+
+{% if customer %}
+
+<!-- Modal overlay -->
+<div id="so-intercept-overlay" style="display:none" role="dialog" aria-modal="true" aria-labelledby="so-intercept-title">
+  <div class="so-intercept__backdrop"></div>
+  <div class="so-intercept__card">
+    <button class="so-intercept__close" id="so-intercept-close" aria-label="Dismiss">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+      </svg>
+    </button>
+
+    <div class="so-intercept__icon" aria-hidden="true">
+      <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="16" cy="16" r="15" fill="#e8f5ee" stroke="#3db870" stroke-width="1.5"/>
+        <path d="M16 8a8 8 0 1 0 8 8" stroke="#1a5c38" stroke-width="1.75" stroke-linecap="round"/>
+        <path d="M21 8v4h-4" stroke="#1a5c38" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+
+    <h2 id="so-intercept-title" class="so-intercept__heading">You have a standing order open</h2>
+
+    <p class="so-intercept__body">
+      You already have a standing order for this week that you can add items to.
+      Would you like to add to your standing order instead of creating a new one?
+    </p>
+
+    <div class="so-intercept__actions">
+      <button id="so-intercept-go" class="so-intercept__btn so-intercept__btn--primary">
+        Add to my standing order →
+      </button>
+      <button id="so-intercept-cart" class="so-intercept__btn so-intercept__btn--secondary">
+        Add to cart instead
+      </button>
+    </div>
+  </div>
+</div>
+
+<style>
+  #so-intercept-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  }
+  .so-intercept__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(2px);
+  }
+  .so-intercept__card {
+    position: relative;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.18);
+    max-width: 420px;
+    width: 100%;
+    padding: 2rem 2rem 1.75rem;
+    text-align: center;
+  }
+  .so-intercept__close {
+    position: absolute;
+    top: 0.875rem;
+    right: 0.875rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #6d7175;
+    padding: 6px;
+    display: flex;
+    align-items: center;
+    border-radius: 4px;
+    opacity: 0.7;
+  }
+  .so-intercept__close:hover { opacity: 1; }
+  .so-intercept__icon {
+    margin-bottom: 1rem;
+  }
+  .so-intercept__heading {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: #0d3b20;
+    margin: 0 0 0.625rem;
+    line-height: 1.3;
+  }
+  .so-intercept__body {
+    font-size: 0.9375rem;
+    color: #4a4a4a;
+    line-height: 1.5;
+    margin: 0 0 1.5rem;
+  }
+  .so-intercept__actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+  }
+  .so-intercept__btn {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: opacity 0.15s, background 0.15s;
+    line-height: 1;
+  }
+  .so-intercept__btn--primary {
+    background: #1a5c38;
+    color: #fff;
+    border-color: #1a5c38;
+  }
+  .so-intercept__btn--primary:hover { background: #0d3b20; border-color: #0d3b20; }
+  .so-intercept__btn--secondary {
+    background: #fff;
+    color: #1a5c38;
+    border-color: #c9cccf;
+  }
+  .so-intercept__btn--secondary:hover { border-color: #1a5c38; }
+</style>
+
+<script>
+(function () {
+  var RESULT_KEY = 'so-check-result';
+  var TS_KEY     = 'so-check-ts';
+  var TTL_MS     = 5 * 60 * 1000; // 5 minutes
+  var overlay    = document.getElementById('so-intercept-overlay');
+  var hasPending = null; // null = not yet known
+  var pendingBtn = null;
+  var skip       = false;
+
+  // ── 1. Pre-fetch standing order status ───────────────────────────────────
+
+  function loadCache() {
+    try {
+      var ts  = parseInt(sessionStorage.getItem(TS_KEY) || '0', 10);
+      var val = sessionStorage.getItem(RESULT_KEY);
+      if (val !== null && Date.now() - ts < TTL_MS) {
+        hasPending = val === '1';
+        return true;
+      }
+    } catch (e) { /* sessionStorage unavailable */ }
+    return false;
+  }
+
+  function saveCache(result) {
+    try {
+      sessionStorage.setItem(RESULT_KEY, result ? '1' : '0');
+      sessionStorage.setItem(TS_KEY, String(Date.now()));
+    } catch (e) { /* ignore */ }
+  }
+
+  if (!loadCache()) {
+    fetch('/apps/standing-orders?intent=check', {
+      credentials: 'same-origin',
+      headers: { 'Accept': 'application/json' }
+    })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (data) {
+        hasPending = !!(data && data.hasPendingOrder);
+        saveCache(hasPending);
+      })
+      .catch(function () { hasPending = false; });
+  }
+
+  // ── 2. Intercept add-to-cart clicks (capture phase) ──────────────────────
+
+  document.addEventListener('click', function (e) {
+    if (skip) { skip = false; return; }
+    if (hasPending !== true) return; // not fetched yet, or no pending order
+
+    // Match standard Shopify add-to-cart buttons:
+    //   • <button name="add">  (Shopify convention)
+    //   • any submit button inside a form whose action includes /cart/add
+    var target = e.target;
+    var btn = target.closest
+      ? target.closest('[name="add"]') || target.closest('form[action*="/cart/add"] [type="submit"]')
+      : null;
+
+    if (!btn) return;
+
+    e.preventDefault();
+    e.stopImmediatePropagation();
+
+    pendingBtn = btn;
+    overlay.style.display = 'flex';
+  }, true /* capture */);
+
+  // ── 3. Dialog button handlers ─────────────────────────────────────────────
+
+  document.getElementById('so-intercept-go').addEventListener('click', function () {
+    window.location.href = '/apps/standing-orders';
+  });
+
+  document.getElementById('so-intercept-cart').addEventListener('click', function () {
+    overlay.style.display = 'none';
+    if (pendingBtn) {
+      skip = true;
+      pendingBtn.click();
+      pendingBtn = null;
+    }
+  });
+
+  document.getElementById('so-intercept-close').addEventListener('click', function () {
+    overlay.style.display = 'none';
+    pendingBtn = null;
+  });
+
+  // Close on backdrop click
+  document.querySelector('.so-intercept__backdrop').addEventListener('click', function () {
+    overlay.style.display = 'none';
+    pendingBtn = null;
+  });
+
+  // Close on Escape key
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && overlay.style.display !== 'none') {
+      overlay.style.display = 'none';
+      pendingBtn = null;
+    }
+  });
+})();
+</script>
+
+{% endif %}
