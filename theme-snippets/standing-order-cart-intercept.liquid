@@ -207,12 +207,15 @@
     if (skip) { skip = false; return; }
     if (hasPending !== true) return; // not fetched yet, or no pending order
 
-    // Match standard Shopify add-to-cart buttons:
-    //   • <button name="add">  (Shopify convention)
-    //   • any submit button inside a form whose action includes /cart/add
+    // Match add-to-cart buttons across:
+    //   • <button name="add">               standard Shopify product forms
+    //   • form[action*="/cart/add"] submit  traditional form-submit themes
+    //   • .wof-add-to-cart-button           Wholesale Order Form app (wholesalehelper.io)
     var target = e.target;
     var btn = target.closest
-      ? target.closest('[name="add"]') || target.closest('form[action*="/cart/add"] [type="submit"]')
+      ? target.closest('[name="add"]') ||
+        target.closest('form[action*="/cart/add"] [type="submit"]') ||
+        target.closest('.wof-add-to-cart-button')
       : null;
 
     if (!btn) return;
