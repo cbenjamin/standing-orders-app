@@ -1,7 +1,8 @@
-import { useLoaderData, Form, useNavigation, useNavigate, redirect } from "react-router";
+import { useLoaderData, useActionData, Form, useNavigation, useNavigate, redirect } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
+import { completeDraftOrderRecord } from "../services/draft-orders.server";
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -26,7 +27,7 @@ export const loader = async ({ request, params }) => {
 };
 
 export const action = async ({ request, params }) => {
-  await authenticate.admin(request);
+  const { admin } = await authenticate.admin(request);
   const formData = await request.formData();
   const intent = formData.get("intent");
 
@@ -48,6 +49,16 @@ export const action = async ({ request, params }) => {
     return null;
   }
 
+  if (intent === "complete-draft") {
+    const recordId = Number(formData.get("draftOrderRecordId"));
+    try {
+      await completeDraftOrderRecord(admin, recordId);
+      return { completedId: recordId };
+    } catch (err) {
+      return { error: `Failed to complete draft order: ${err.message}` };
+    }
+  }
+
   return null;
 };
 
@@ -58,9 +69,13 @@ function gidToId(gid) {
 
 export default function StandingOrderDetail() {
   const { order, shop } = useLoaderData();
+  const actionData = useActionData();
   const navigation = useNavigation();
   const navigate = useNavigate();
   const isSubmitting = navigation.state === "submitting";
+  const completingId = isSubmitting && navigation.formData?.get("intent") === "complete-draft"
+    ? Number(navigation.formData.get("draftOrderRecordId"))
+    : null;
 
   const draftStatusColor = {
     open: { background: "#e3f1df", color: "#0d3b2e" },
@@ -225,6 +240,11 @@ export default function StandingOrderDetail() {
 
       {/* Draft orders */}
       <s-section heading="Generated draft orders">
+        {actionData?.error && (
+          <div style={{ background: "#ffd2cc", color: "#7c1a00", padding: "0.75rem 1rem", borderRadius: 6, marginBottom: "1rem", fontSize: "0.875rem" }}>
+            {actionData.error}
+          </div>
+        )}
         {order.draftOrders.length === 0 ? (
           <p style={{ fontSize: "0.875rem", color: "#6d7175" }}>
             No draft orders generated yet. They will be created automatically each week.
@@ -233,7 +253,7 @@ export default function StandingOrderDetail() {
           <table style={tableStyle}>
             <thead>
               <tr style={{ borderBottom: "1px solid #e1e3e5" }}>
-                {["Draft order", "Delivery date", "Status", "Converted order"].map((h) => (
+                {["Draft order", "Delivery date", "Status", "Converted order", ""].map((h) => (
                   <th key={h} style={thStyle}>{h}</th>
                 ))}
               </tr>
@@ -273,6 +293,25 @@ export default function StandingOrderDetail() {
                         {d.completedOrderName || d.completedOrderId}
                       </a>
                     ) : "—"}
+                  </td>
+                  <td style={{ ...tdStyle, textAlign: "right" }}>
+                    {(d.status === "open" || d.status === "locked") && (
+                      <Form method="POST" style={{ display: "inline" }}>
+                        <input type="hidden" name="intent" value="complete-draft" />
+                        <input type="hidden" name="draftOrderRecordId" value={d.id} />
+                        <s-button
+                          size="slim"
+                          disabled={isSubmitting || undefined}
+                          onClick={(e) => {
+                            if (confirm(`Lock and complete this draft order (${d.shopifyDraftOrderName || "draft"}) now? This will immediately convert it to an order.`)) {
+                              e.currentTarget.closest("form")?.requestSubmit();
+                            }
+                          }}
+                        >
+                          {completingId === d.id ? "Completing…" : "Lock & complete"}
+                        </s-button>
+                      </Form>
+                    )}
                   </td>
                 </tr>
               ))}
