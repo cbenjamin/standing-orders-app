@@ -1,6 +1,28 @@
 // Each function accepts an `admin` client from either
 // authenticate.admin(request) or unauthenticated.admin(shop)
 
+export async function getCustomerTagsBatch(admin, customerGids) {
+  if (!customerGids.length) return {};
+  const response = await admin.graphql(
+    `#graphql
+    query GetCustomerTags($ids: [ID!]!) {
+      nodes(ids: $ids) {
+        ... on Customer {
+          id
+          tags
+        }
+      }
+    }`,
+    { variables: { ids: customerGids } },
+  );
+  const json = await response.json();
+  const map = {};
+  for (const node of json.data.nodes) {
+    if (node?.id) map[node.id] = node.tags ?? [];
+  }
+  return map; // { "gid://shopify/Customer/123": ["Route A", "wholesale", ...] }
+}
+
 export async function searchCustomers(admin, query) {
   const response = await admin.graphql(
     `#graphql

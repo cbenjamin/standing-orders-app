@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
+import { getCustomerTagsBatch } from "../services/shopify-graphql.server";
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -13,7 +14,7 @@ function formatDate(dateStr) {
 }
 
 export const loader = async ({ request }) => {
-  await authenticate.admin(request);
+  const { admin } = await authenticate.admin(request);
   const url = new URL(request.url);
   const showArchived = url.searchParams.get("archived") === "1";
   const q = url.searchParams.get("q")?.trim() || "";
@@ -37,7 +38,18 @@ export const loader = async ({ request }) => {
 
   const archivedCount = await prisma.standingOrder.count({ where: { status: "archived" } });
 
-  return { orders, showArchived, archivedCount, q };
+  // Batch-fetch customer tags from Shopify (one request for all customers)
+  const uniqueCustomerIds = [...new Set(orders.map((o) => o.shopifyCustomerId))];
+  const customerTagsMap = await getCustomerTagsBatch(admin, uniqueCustomerIds);
+
+  // Attach the first "Route" tag to each order
+  const ordersWithTags = orders.map((o) => {
+    const tags = customerTagsMap[o.shopifyCustomerId] ?? [];
+    const routeTag = tags.find((t) => t.toLowerCase().includes("route")) ?? null;
+    return { ...o, routeTag };
+  });
+
+  return { orders: ordersWithTags, showArchived, archivedCount, q };
 };
 
 export default function StandingOrderList() {
@@ -108,7 +120,7 @@ export default function StandingOrderList() {
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.875rem" }}>
             <thead>
               <tr style={{ borderBottom: "1px solid #e1e3e5" }}>
-                {["Name", "Customer", "Items", "Delivery day", "Date range", "Status"].map((h) => (
+                {["Name", "Customer", "Route", "Items", "Delivery day", "Date range", "Status"].map((h) => (
                   <th key={h} style={{ padding: "0.5rem 0.75rem", textAlign: "left", color: "#6d7175", fontWeight: 500 }}>
                     {h}
                   </th>
@@ -129,6 +141,15 @@ export default function StandingOrderList() {
                   <td style={{ padding: "0.75rem" }}>
                     <div style={{ fontWeight: 500 }}>{order.customerName}</div>
                     <div style={{ color: "#6d7175", fontSize: "0.8125rem" }}>{order.customerEmail}</div>
+                  </td>
+                  <td style={{ padding: "0.75rem" }}>
+                    {order.routeTag ? (
+                      <span style={{ background: "#e8f0fe", color: "#1a3d8f", padding: "2px 8px", borderRadius: 10, fontSize: "0.75rem", fontWeight: 500 }}>
+                        {order.routeTag}
+                      </span>
+                    ) : (
+                      <span style={{ color: "#c9cccf" }}>—</span>
+                    )}
                   </td>
                   <td style={{ padding: "0.75rem" }}>{order._count.items}</td>
                   <td style={{ padding: "0.75rem" }}>{DAY_NAMES[order.deliveryDay]}</td>
