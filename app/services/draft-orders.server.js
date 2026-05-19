@@ -177,6 +177,43 @@ export async function applyCustomerDraftOrderUpdate(admin, draftOrderRecordId, l
   });
 }
 
+/**
+ * Re-submits the current line items on a draft order so Shopify re-validates
+ * prices. Required when a draft was manually edited and Shopify flags its
+ * custom prices as stale before draftOrderComplete can proceed.
+ */
+async function refreshDraftOrderPrices(admin, draftOrderId) {
+  const draft = await getDraftOrderDetails(admin, draftOrderId);
+
+  const lineItems = draft.lineItems.edges.map(({ node }) => {
+    if (node.variant?.id) {
+      // Variant-based line item — re-apply standing-order discount if present
+      const original = parseFloat(node.originalUnitPrice || 0);
+      const discounted = parseFloat(node.discountedUnitPrice ?? node.originalUnitPrice ?? 0);
+      const item = { variantId: node.variant.id, quantity: node.quantity };
+      if (discounted < original) {
+        item.appliedDiscount = {
+          valueType: "FIXED_AMOUNT",
+          value: parseFloat((original - discounted).toFixed(2)),
+          title: "Standing order price",
+        };
+      }
+      return item;
+    } else {
+      // Custom line item (no variant) — preserve title, price, quantity
+      return {
+        title: node.title,
+        originalUnitPrice: node.discountedUnitPrice ?? node.originalUnitPrice,
+        quantity: node.quantity,
+        taxable: node.taxable ?? true,
+      };
+    }
+  });
+
+  console.log(`[draft-orders] Refreshing prices on ${draftOrderId} (${lineItems.length} items)`);
+  await updateDraftOrder(admin, { draftOrderId, lineItems });
+}
+
 export async function completeDraftOrderRecord(admin, recordId) {
   // Claim the record immediately to prevent concurrent runs from processing it twice
   const claimed = await prisma.draftOrderRecord.updateMany({
@@ -195,7 +232,22 @@ export async function completeDraftOrderRecord(admin, recordId) {
       include: { standingOrder: true },
     });
 
-    const order = await createOrderFromDraft(admin, record.shopifyDraftOrderId);
+    let order;
+    try {
+      order = await createOrderFromDraft(admin, record.shopifyDraftOrderId);
+    } catch (priceErr) {
+      // Shopify rejects completion when a draft was manually edited and its
+      // custom prices are now considered stale. Fix: re-push the current line
+      // items so Shopify re-validates, then retry once.
+      if (priceErr.message.includes("previously proposed price")) {
+        console.log(`[draft-orders] Stale price on record ${recordId} — refreshing and retrying`);
+        await refreshDraftOrderPrices(admin, record.shopifyDraftOrderId);
+        order = await createOrderFromDraft(admin, record.shopifyDraftOrderId);
+      } else {
+        throw priceErr;
+      }
+    }
+
     const orderId = order?.id || null;
     const orderName = order?.name || null;
 

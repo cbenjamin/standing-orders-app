@@ -268,7 +268,7 @@ export async function getDraftOrderDetails(admin, draftOrderId) {
         lineItems(first: 50) {
           edges {
             node {
-              id title quantity originalUnitPrice discountedUnitPrice
+              id title quantity originalUnitPrice discountedUnitPrice taxable
               variant { id title image { url } }
               product { id title }
             }
