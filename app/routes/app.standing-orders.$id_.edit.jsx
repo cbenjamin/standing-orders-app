@@ -47,7 +47,7 @@ export const action = async ({ request, params }) => {
   const startDate = formData.get("startDate");
   const endDate = formData.get("endDate");
   const deliveryDay = parseInt(formData.get("deliveryDay"), 10);
-  const closeDay = (deliveryDay - 1 + 7) % 7;
+  const closeDay = parseInt(formData.get("closeDay"), 10);
   const closeTime = formData.get("closeTime") || "12:00";
   const sendReminder = formData.get("sendReminder") === "true";
   const sendCreationEmail = formData.get("sendCreationEmail") === "true";
@@ -117,11 +117,15 @@ export default function EditStandingOrder() {
     })),
   );
   const [deliveryDay, setDeliveryDay] = useState(String(order.deliveryDay));
+  const [closeDay, setCloseDay] = useState(String(order.closeDay));
   const [sendReminder, setSendReminder] = useState(order.sendReminder ?? true);
   const [sendCreationEmail, setSendCreationEmail] = useState(order.sendCreationEmail ?? true);
 
-  const closeDay = (parseInt(deliveryDay, 10) - 1 + 7) % 7;
-  const closeDayLabel = DAY_OPTIONS.find((o) => o.value === String(closeDay))?.label;
+  const handleDeliveryDayChange = (val) => {
+    setDeliveryDay(val);
+    // Auto-reset deadline to the day before the new delivery day
+    setCloseDay(String((parseInt(val, 10) - 1 + 7) % 7));
+  };
 
   const handleCustomerSearch = useCallback(
     (val) => {
@@ -237,13 +241,20 @@ export default function EditStandingOrder() {
           <div style={{ ...formRowStyle, gap: "1rem" }}>
             <div style={fieldColStyle}>
               <label style={labelStyle}>Delivery day *</label>
-              <select name="deliveryDay" style={inputStyle} value={deliveryDay} onChange={(e) => setDeliveryDay(e.target.value)}>
+              <select name="deliveryDay" style={inputStyle} value={deliveryDay} onChange={(e) => handleDeliveryDayChange(e.target.value)}>
                 {DAY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </div>
             <div style={fieldColStyle}>
-              <label style={labelStyle}>Customer deadline (auto)</label>
-              <input style={{ ...inputStyle, background: "#f6f6f7", color: "#6d7175" }} value={closeDayLabel} disabled readOnly />
+              <label style={labelStyle}>Customer deadline *</label>
+              <select
+                name="closeDay"
+                style={inputStyle}
+                value={closeDay}
+                onChange={(e) => setCloseDay(e.target.value)}
+              >
+                {DAY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
             </div>
           </div>
           <div style={{ ...formRowStyle, gap: "1rem" }}>
