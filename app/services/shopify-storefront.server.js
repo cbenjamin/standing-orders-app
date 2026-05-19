@@ -64,9 +64,11 @@ export async function searchStorefrontProducts(query) {
     }`,
     { query },
   );
-  return data.products.edges.map((e) => ({
-    id: e.node.id,
-    title: e.node.title,
-    variants: e.node.variants.edges.map((v) => v.node),
-  }));
+  return data.products.edges
+    .map((e) => ({
+      id: e.node.id,
+      title: e.node.title,
+      variants: e.node.variants.edges.map((v) => v.node).filter((v) => v.availableForSale),
+    }))
+    .filter((p) => p.variants.length > 0);
 }
