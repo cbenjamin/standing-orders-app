@@ -42,15 +42,6 @@ export const loader = async ({ request }) => {
   const uniqueCustomerIds = [...new Set(orders.map((o) => o.shopifyCustomerId))];
   const customerTagsMap = await getCustomerTagsBatch(admin, uniqueCustomerIds);
 
-  // DEBUG: log any customers whose GID wasn't found in the Shopify response
-  for (const order of orders) {
-    if (!customerTagsMap[order.shopifyCustomerId]) {
-      console.log(`[standing-orders] No tags returned for "${order.name}" — customerId: ${order.shopifyCustomerId}`);
-    } else {
-      console.log(`[standing-orders] Tags for "${order.name}": ${JSON.stringify(customerTagsMap[order.shopifyCustomerId])}`);
-    }
-  }
-
   // Attach the first "Route" tag to each order
   const ordersWithTags = orders.map((o) => {
     const tags = customerTagsMap[o.shopifyCustomerId] ?? [];
