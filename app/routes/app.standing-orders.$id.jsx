@@ -3,6 +3,7 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { completeDraftOrderRecord } from "../services/draft-orders.server";
+import { deleteDraftOrder } from "../services/shopify-graphql.server";
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -59,6 +60,23 @@ export const action = async ({ request, params }) => {
     }
   }
 
+  if (intent === "cancel-draft") {
+    const recordId = Number(formData.get("draftOrderRecordId"));
+    try {
+      const record = await prisma.draftOrderRecord.findUnique({ where: { id: recordId } });
+      if (!record) return { error: "Draft order record not found" };
+      if (record.status === "completed") return { error: "Cannot cancel a completed order" };
+      await deleteDraftOrder(admin, record.shopifyDraftOrderId);
+      await prisma.draftOrderRecord.update({
+        where: { id: recordId },
+        data: { status: "cancelled" },
+      });
+      return { cancelledId: recordId };
+    } catch (err) {
+      return { error: `Failed to cancel draft order: ${err.message}` };
+    }
+  }
+
   return null;
 };
 
@@ -76,11 +94,15 @@ export default function StandingOrderDetail() {
   const completingId = isSubmitting && navigation.formData?.get("intent") === "complete-draft"
     ? Number(navigation.formData.get("draftOrderRecordId"))
     : null;
+  const cancellingId = isSubmitting && navigation.formData?.get("intent") === "cancel-draft"
+    ? Number(navigation.formData.get("draftOrderRecordId"))
+    : null;
 
   const draftStatusColor = {
     open: { background: "#e3f1df", color: "#0d3b2e" },
     completed: { background: "#d1ecf1", color: "#0c5460" },
     locked: { background: "#fff3cd", color: "#7c5501" },
+    cancelled: { background: "#ffd2cc", color: "#7c1a00" },
   };
 
   return (
@@ -262,7 +284,7 @@ export default function StandingOrderDetail() {
               {order.draftOrders.map((d) => (
                 <tr key={d.id} style={{ borderBottom: "1px solid #f6f6f7" }}>
                   <td style={tdStyle}>
-                    {d.status === "completed" ? (
+                    {(d.status === "completed" || d.status === "cancelled") ? (
                       <span style={{ color: "#6d7175" }}>{d.shopifyDraftOrderName || "—"}</span>
                     ) : (
                       <a
@@ -296,21 +318,39 @@ export default function StandingOrderDetail() {
                   </td>
                   <td style={{ ...tdStyle, textAlign: "right" }}>
                     {(d.status === "open" || d.status === "locked") && (
-                      <Form method="POST" style={{ display: "inline" }}>
-                        <input type="hidden" name="intent" value="complete-draft" />
-                        <input type="hidden" name="draftOrderRecordId" value={d.id} />
-                        <s-button
-                          size="slim"
-                          disabled={isSubmitting || undefined}
-                          onClick={(e) => {
-                            if (confirm(`Lock and complete this draft order (${d.shopifyDraftOrderName || "draft"}) now? This will immediately convert it to an order.`)) {
-                              e.currentTarget.closest("form")?.requestSubmit();
-                            }
-                          }}
-                        >
-                          {completingId === d.id ? "Completing…" : "Lock & complete"}
-                        </s-button>
-                      </Form>
+                      <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
+                        <Form method="POST" style={{ display: "inline" }}>
+                          <input type="hidden" name="intent" value="complete-draft" />
+                          <input type="hidden" name="draftOrderRecordId" value={d.id} />
+                          <s-button
+                            size="slim"
+                            disabled={isSubmitting || undefined}
+                            onClick={(e) => {
+                              if (confirm(`Lock and complete this draft order (${d.shopifyDraftOrderName || "draft"}) now? This will immediately convert it to an order.`)) {
+                                e.currentTarget.closest("form")?.requestSubmit();
+                              }
+                            }}
+                          >
+                            {completingId === d.id ? "Completing…" : "Lock & complete"}
+                          </s-button>
+                        </Form>
+                        <Form method="POST" style={{ display: "inline" }}>
+                          <input type="hidden" name="intent" value="cancel-draft" />
+                          <input type="hidden" name="draftOrderRecordId" value={d.id} />
+                          <s-button
+                            size="slim"
+                            variant="secondary"
+                            disabled={isSubmitting || undefined}
+                            onClick={(e) => {
+                              if (confirm(`Cancel and delete this draft order (${d.shopifyDraftOrderName || "draft"}) in Shopify? This cannot be undone.`)) {
+                                e.currentTarget.closest("form")?.requestSubmit();
+                              }
+                            }}
+                          >
+                            {cancellingId === d.id ? "Cancelling…" : "Cancel"}
+                          </s-button>
+                        </Form>
+                      </div>
                     )}
                   </td>
                 </tr>

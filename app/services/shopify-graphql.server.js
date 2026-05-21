@@ -224,6 +224,22 @@ export async function createOrderFromDraft(admin, draftOrderId) {
   return draftOrder?.order ?? null;
 }
 
+export async function deleteDraftOrder(admin, draftOrderId) {
+  const response = await admin.graphql(
+    `#graphql
+    mutation DraftOrderDelete($input: DraftOrderDeleteInput!) {
+      draftOrderDelete(input: $input) {
+        deletedId
+        userErrors { field message }
+      }
+    }`,
+    { variables: { input: { id: draftOrderId } } },
+  );
+  const json = await response.json();
+  const { userErrors } = json.data.draftOrderDelete;
+  if (userErrors?.length) throw new Error(userErrors.map((e) => e.message).join(", "));
+}
+
 export async function completeDraftOrder(admin, draftOrderId) {
   const response = await admin.graphql(
     `#graphql
