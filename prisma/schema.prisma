@@ -79,6 +79,8 @@ model DraftOrderRecord {
   reminderSentAt        DateTime?
   items                 DraftOrderItem[]
   events                StandingOrderEvent[]
+
+  @@unique([standingOrderId, deliveryDate])
 }
 
 model StandingOrderEvent {

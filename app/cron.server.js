@@ -152,6 +152,16 @@ export async function runDraftOrderReminder() {
 
 export function initCron() {
   if (started) return;
+
+  // In PM2 cluster mode each worker gets NODE_APP_INSTANCE = "0", "1", "2", ...
+  // Only instance 0 (or a single fork-mode process where the var is undefined)
+  // should run the scheduler — otherwise every instance fires every cron job.
+  const instanceId = process.env.NODE_APP_INSTANCE;
+  if (instanceId !== undefined && instanceId !== "0") {
+    console.log(`[cron] Skipping scheduler on PM2 instance ${instanceId} — only instance 0 runs cron`);
+    return;
+  }
+
   started = true;
 
   const createSchedule = process.env.CRON_DRAFT_CREATE || "0 6 * * *";

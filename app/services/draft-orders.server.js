@@ -31,6 +31,10 @@ export async function createDraftOrderForStandingOrder(admin, standingOrder) {
   });
   if (existing) return null;
 
+  // Note: even if the findFirst above races, the @@unique constraint on
+  // (standingOrderId, deliveryDate) will cause the create below to throw
+  // a unique-constraint error, which we catch and treat as "already exists".
+
   // Fetch current variant prices so we can apply a line-item discount
   // to reach the custom standing order price (Shopify ignores originalUnitPrice
   // when variantId is provided, so appliedDiscount is the reliable override)
@@ -61,22 +65,33 @@ export async function createDraftOrderForStandingOrder(admin, standingOrder) {
     tags: ["standing-order", `standing-order-id:${standingOrder.id}`],
   });
 
-  await prisma.draftOrderRecord.create({
-    data: {
-      standingOrderId: standingOrder.id,
-      shopifyDraftOrderId: shopifyDraftOrder.id,
-      shopifyDraftOrderName: shopifyDraftOrder.name,
-      deliveryDate,
-      status: "open",
-      items: {
-        create: standingOrder.items.map((item) => ({
-          shopifyVariantId: item.shopifyVariantId,
-          minimumQuantity: item.quantity,
-          isStandingItem: true,
-        })),
+  try {
+    await prisma.draftOrderRecord.create({
+      data: {
+        standingOrderId: standingOrder.id,
+        shopifyDraftOrderId: shopifyDraftOrder.id,
+        shopifyDraftOrderName: shopifyDraftOrder.name,
+        deliveryDate,
+        status: "open",
+        items: {
+          create: standingOrder.items.map((item) => ({
+            shopifyVariantId: item.shopifyVariantId,
+            minimumQuantity: item.quantity,
+            isStandingItem: true,
+          })),
+        },
       },
-    },
-  });
+    });
+  } catch (err) {
+    // Unique constraint violation — another process already created this record
+    // (race between concurrent scheduler instances). The Shopify draft we just
+    // created is a true duplicate; log and bail so the caller ignores it.
+    if (err.code === "P2002") {
+      console.warn(`[draft-orders] Duplicate draft avoided for "${standingOrder.name}" on ${deliveryDate} — Shopify draft ${shopifyDraftOrder.id} may need manual cancellation`);
+      return null;
+    }
+    throw err;
+  }
 
   // Fetch the newly created record id for event logging
   const newRecord = await prisma.draftOrderRecord.findFirst({
