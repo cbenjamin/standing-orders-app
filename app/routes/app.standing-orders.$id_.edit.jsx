@@ -175,7 +175,7 @@ export default function EditStandingOrder() {
   const productResults = productFetcher.data?.products || [];
 
   return (
-    <s-page heading={`Edit: ${order.name}`}>
+    <s-page inlineSize="large" heading={`Edit: ${order.name}`}>
       <s-button slot="primary-action" variant="tertiary" onClick={() => navigate(`/app/standing-orders/${order.id}`)}>
         Cancel
       </s-button>

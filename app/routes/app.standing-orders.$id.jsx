@@ -106,7 +106,7 @@ export default function StandingOrderDetail() {
   };
 
   return (
-    <s-page heading={order.name}>
+    <s-page inlineSize="large" heading={order.name}>
       <s-button slot="primary-action" variant="primary" onClick={() => navigate(`/app/standing-orders/${order.id}/edit`)}>
         Edit
       </s-button>

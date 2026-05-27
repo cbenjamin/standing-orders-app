@@ -183,7 +183,7 @@ export default function NewStandingOrder() {
   const productResults = productFetcher.data?.products || [];
 
   return (
-    <s-page heading="Create Standing Order">
+    <s-page inlineSize="large" heading="Create Standing Order">
       <s-button slot="primary-action" variant="tertiary" onClick={() => navigate("/app/standing-orders")}>
         Cancel
       </s-button>

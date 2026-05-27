@@ -73,7 +73,7 @@ export default function OrdersList() {
   };
 
   return (
-    <s-page heading="Orders">
+    <s-page inlineSize="large" heading="Orders">
       {/* Status tabs */}
       <div style={{ display: "flex", gap: 0, borderBottom: "1px solid #e1e3e5", marginBottom: "1rem" }}>
         {STATUSES.map((s) => (

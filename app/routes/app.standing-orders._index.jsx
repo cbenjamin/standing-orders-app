@@ -76,7 +76,7 @@ export default function StandingOrderList() {
   };
 
   return (
-    <s-page heading="Standing Orders">
+    <s-page inlineSize="large" heading="Standing Orders">
       <s-button slot="primary-action" variant="primary" onClick={() => navigate("/app/standing-orders/new")}>
         Create standing order
       </s-button>
