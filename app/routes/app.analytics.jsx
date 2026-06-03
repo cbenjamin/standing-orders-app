@@ -65,7 +65,13 @@ export const loader = async ({ request }) => {
       deliveryDate: true,
       standingOrderId: true,
       standingOrder: {
-        select: { id: true, name: true, customerName: true, shopifyCustomerId: true },
+        select: {
+          id: true,
+          name: true,
+          customerName: true,
+          shopifyCustomerId: true,
+          items: { select: { price: true, quantity: true } },
+        },
       },
     },
   });
@@ -80,6 +86,15 @@ export const loader = async ({ request }) => {
   const conversionRate = denominator > 0
     ? Math.round((completedCount / denominator) * 100)
     : null;
+
+  // ── Lost revenue from cancelled orders ──────────────────────────────────────
+  let lostRevenue = 0;
+  for (const r of allRecords) {
+    if (r.status !== "cancelled") continue;
+    for (const item of r.standingOrder?.items ?? []) {
+      lostRevenue += parseFloat(item.price) * item.quantity;
+    }
+  }
 
   // ── Revenue & engagement (from customer_updated events) ─────────────────────
   const updateEvents = await prisma.standingOrderEvent.findMany({
@@ -174,6 +189,7 @@ export const loader = async ({ request }) => {
     cancelledCount,
     openCount,
     conversionRate,
+    lostRevenue: parseFloat(lostRevenue.toFixed(2)),
     additionalRevenue: parseFloat(additionalRevenue.toFixed(2)),
     modifiedOrdersCount,
     avgAdditional: parseFloat(avgAdditional.toFixed(2)),
@@ -193,6 +209,7 @@ export default function Analytics() {
     cancelledCount,
     openCount,
     conversionRate,
+    lostRevenue,
     additionalRevenue,
     modifiedOrdersCount,
     avgAdditional,
@@ -259,7 +276,12 @@ export default function Analytics() {
             sub="average additional spend"
             accent="neutral"
           />
-          <div /> {/* spacer */}
+          <KpiCard
+            label="Lost revenue"
+            value={fmtMoney(lostRevenue)}
+            sub="base value of cancelled orders"
+            accent={lostRevenue > 0 ? "red" : "neutral"}
+          />
         </div>
       </s-section>
 
